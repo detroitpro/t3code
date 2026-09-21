@@ -17,7 +17,11 @@ const refA = scopeThreadRef("env-1" as EnvironmentId, ThreadId.make("thread-A"))
 const refB = scopeThreadRef("env-1" as EnvironmentId, ThreadId.make("thread-B"));
 
 beforeEach(() => {
-  useRightPanelStore.setState({ byThreadKey: {}, userActionRevisionByThreadKey: {} });
+  useRightPanelStore.setState({
+    byThreadKey: {},
+    openFilesOnNewThread: true,
+    userActionRevisionByThreadKey: {},
+  });
 });
 
 describe("rightPanelStore", () => {
@@ -237,6 +241,7 @@ describe("rightPanelStore", () => {
           surfaces: [{ id: "browser:tab-a", kind: "preview", resourceId: "tab-a" }],
         },
       },
+      openFilesOnNewThread: true,
     });
   });
 
@@ -267,6 +272,7 @@ describe("rightPanelStore", () => {
           ],
         },
       },
+      openFilesOnNewThread: true,
     });
   });
 
@@ -297,6 +303,7 @@ describe("rightPanelStore", () => {
           ],
         },
       },
+      openFilesOnNewThread: true,
     });
   });
 
@@ -340,6 +347,7 @@ describe("rightPanelStore", () => {
           ],
         },
       },
+      openFilesOnNewThread: true,
     });
   });
 
@@ -369,7 +377,10 @@ describe("rightPanelStore", () => {
           "env-1:thread-A": panelState,
         },
       }),
-    ).toEqual({ byThreadKey: { "env-1:thread-A": panelState } });
+    ).toEqual({
+      byThreadKey: { "env-1:thread-A": panelState },
+      openFilesOnNewThread: true,
+    });
   });
 
   it("drops persisted plan surfaces and does not reopen an empty panel", () => {
@@ -404,7 +415,109 @@ describe("rightPanelStore", () => {
           surfaces: [{ id: "diff", kind: "diff" }],
         },
       },
+      openFilesOnNewThread: true,
     });
+  });
+
+  it("preserves a saved openFilesOnNewThread preference during migration", () => {
+    expect(
+      migratePersistedRightPanelState({
+        byThreadKey: {},
+        openFilesOnNewThread: false,
+      }),
+    ).toEqual({ byThreadKey: {}, openFilesOnNewThread: false });
+  });
+
+  it("seedFilesOnNewThread opens Files on an empty thread", () => {
+    const store = useRightPanelStore.getState();
+    store.seedFilesOnNewThread(refA);
+    expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refA)).toBe("files");
+    expect(selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA)).toEqual({
+      isOpen: true,
+      activeSurfaceId: "files",
+      surfaces: [{ id: "files", kind: "files" }],
+    });
+    expect(store.getUserActionRevision(refA)).toBe(0);
+  });
+
+  it("seedFilesOnNewThread no-ops when the preference is off", () => {
+    useRightPanelStore.setState({ openFilesOnNewThread: false });
+    useRightPanelStore.getState().seedFilesOnNewThread(refA);
+    expect(selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA)).toEqual({
+      isOpen: false,
+      activeSurfaceId: null,
+      surfaces: [],
+    });
+  });
+
+  it("seedFilesOnNewThread no-ops when surfaces already exist", () => {
+    const store = useRightPanelStore.getState();
+    store.open(refA, "diff");
+    useRightPanelStore.setState({ userActionRevisionByThreadKey: {} });
+    store.seedFilesOnNewThread(refA);
+    expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refA)).toBe("diff");
+    expect(
+      selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA).surfaces,
+    ).toEqual([{ id: "diff", kind: "diff" }]);
+  });
+
+  it("seedFilesOnNewThread no-ops when userActionRevision is already advanced", () => {
+    const store = useRightPanelStore.getState();
+    store.open(refA, "files");
+    store.close(refA);
+    expect(store.getUserActionRevision(refA)).toBeGreaterThan(0);
+    // Clear configured panel state but keep the session revision.
+    useRightPanelStore.setState({
+      byThreadKey: {},
+      openFilesOnNewThread: true,
+      userActionRevisionByThreadKey: useRightPanelStore.getState().userActionRevisionByThreadKey,
+    });
+    store.seedFilesOnNewThread(refA);
+    expect(selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA)).toEqual({
+      isOpen: false,
+      activeSurfaceId: null,
+      surfaces: [],
+    });
+  });
+
+  it("closing the panel turns off openFilesOnNewThread", () => {
+    const store = useRightPanelStore.getState();
+    store.open(refA, "files");
+    expect(useRightPanelStore.getState().openFilesOnNewThread).toBe(true);
+    store.close(refA);
+    expect(useRightPanelStore.getState().openFilesOnNewThread).toBe(false);
+    store.show(refA);
+    store.toggleVisibility(refA);
+    expect(useRightPanelStore.getState().openFilesOnNewThread).toBe(false);
+  });
+
+  it("opening Files turns openFilesOnNewThread back on", () => {
+    useRightPanelStore.setState({ openFilesOnNewThread: false });
+    useRightPanelStore.getState().open(refA, "files");
+    expect(useRightPanelStore.getState().openFilesOnNewThread).toBe(true);
+
+    useRightPanelStore.setState({
+      byThreadKey: {},
+      openFilesOnNewThread: false,
+      userActionRevisionByThreadKey: {},
+    });
+    useRightPanelStore.getState().toggle(refA, "files");
+    expect(useRightPanelStore.getState().openFilesOnNewThread).toBe(true);
+    expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refA)).toBe("files");
+  });
+
+  it("openProactive still respects user revision after seed", () => {
+    const store = useRightPanelStore.getState();
+    store.seedFilesOnNewThread(refA);
+    const revisionAfterSeed = store.getUserActionRevision(refA);
+    expect(revisionAfterSeed).toBe(0);
+    expect(store.openProactive(refA, completedDiff, revisionAfterSeed)).toBe(true);
+    expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refA)).toBe("diff");
+
+    store.close(refA);
+    const revisionAfterClose = store.getUserActionRevision(refA);
+    expect(store.openProactive(refA, completedDiff, revisionAfterSeed)).toBe(false);
+    expect(store.openProactive(refA, completedDiff, revisionAfterClose)).toBe(true);
   });
 
   it("open sets the active panel for a thread", () => {

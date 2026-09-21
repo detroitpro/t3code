@@ -92,7 +92,8 @@ const RIGHT_PANEL_STORAGE_KEY = "t3code:right-panel-state:v2";
 // v10 keys pull-request surfaces by reference instead of a singleton tab.
 // v11 stops persisting the pull-request list's shared panel, so a restart opens the page fresh.
 // v12 adds the device surface.
-const RIGHT_PANEL_STORAGE_VERSION = 13;
+// v14 persists openFilesOnNewThread (default Files panel on empty threads).
+const RIGHT_PANEL_STORAGE_VERSION = 14;
 
 /** A fixed workspace-level ref: each PR surface carries its own real environment. */
 export const PULL_REQUESTS_PANEL_REF = scopeThreadRef(
@@ -115,6 +116,12 @@ export interface ThreadRightPanelState {
 
 interface RightPanelStoreState {
   byThreadKey: Record<string, ThreadRightPanelState>;
+  /**
+   * When true, the first activation of a thread with empty right-panel state
+   * opens the Files surface. Closing the panel turns this off; opening Files
+   * turns it back on.
+   */
+  openFilesOnNewThread: boolean;
   /** Session-only count of user panel choices per thread. Automatic updates do not advance it. */
   userActionRevisionByThreadKey: Record<string, number>;
   getUserActionRevision: (ref: ScopedThreadRef) => number;
@@ -127,6 +134,11 @@ interface RightPanelStoreState {
     surface: Extract<RightPanelSurface, { kind: "diff" | "pull-request" | "pull-requests" }>,
     expectedUserActionRevision: number,
   ) => boolean;
+  /**
+   * Seed Files on a brand-new thread when `openFilesOnNewThread` allows it.
+   * Uses automaticUpdate so proactive panels can still open afterward.
+   */
+  seedFilesOnNewThread: (ref: ScopedThreadRef) => void;
   open: (
     ref: ScopedThreadRef,
     kind: Exclude<RightPanelKind, "file" | "terminal" | "pull-request">,
@@ -301,8 +313,8 @@ const updateThread = (
 };
 
 // Every store action is a user choice unless it goes through `automaticUpdate`.
-// Only `openProactive` and resource reconciliation are automatic, so a new
-// action counts as a user choice by default.
+// Only `openProactive`, `seedFilesOnNewThread`, and resource reconciliation are
+// automatic, so a new action counts as a user choice by default.
 const automaticUpdate = (
   state: RightPanelStoreState,
   threadKey: string,
@@ -348,10 +360,16 @@ function normalizeRevealLine(line: number | undefined): number | null {
 
 export function migratePersistedRightPanelState(persistedState: unknown): {
   byThreadKey: Record<string, ThreadRightPanelState>;
+  openFilesOnNewThread: boolean;
 } {
   if (!persistedState || typeof persistedState !== "object") {
-    return { byThreadKey: {} };
+    return { byThreadKey: {}, openFilesOnNewThread: true };
   }
+  const openFilesOnNewThread =
+    "openFilesOnNewThread" in persistedState &&
+    typeof persistedState.openFilesOnNewThread === "boolean"
+      ? persistedState.openFilesOnNewThread
+      : true;
   const byThreadKey =
     "byThreadKey" in persistedState &&
     persistedState.byThreadKey &&
@@ -473,13 +491,14 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
             }),
         )
       : {};
-  return { byThreadKey };
+  return { byThreadKey, openFilesOnNewThread };
 }
 
 export const useRightPanelStore = create<RightPanelStoreState>()(
   persist(
     (set, get) => ({
       byThreadKey: {},
+      openFilesOnNewThread: true,
       userActionRevisionByThreadKey: {},
       getUserActionRevision: (ref) =>
         get().userActionRevisionByThreadKey[scopedThreadKey(ref)] ?? 0,
@@ -506,16 +525,30 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
         });
         return opened;
       },
+      seedFilesOnNewThread: (ref) =>
+        set((state) => {
+          if (!state.openFilesOnNewThread) return state;
+          const threadKey = scopedThreadKey(ref);
+          if ((state.userActionRevisionByThreadKey[threadKey] ?? 0) > 0) return state;
+          // Any persisted/configured entry means this thread already had panel
+          // state (including dismissed-device-only records). Do not re-seed.
+          if (threadKey in state.byThreadKey) return state;
+          return automaticUpdate(state, threadKey, (current) => {
+            if (current.isOpen || current.surfaces.length > 0) return current;
+            return upsertSurface(current, singletonSurface("files"));
+          });
+        }),
       open: (ref, kind) =>
-        set((state) =>
-          userAction(state, scopedThreadKey(ref), (current) => {
+        set((state) => {
+          const next = userAction(state, scopedThreadKey(ref), (current) => {
             if (kind === "preview") {
               const existing = current.surfaces.find((surface) => surface.kind === "preview");
               return upsertSurface(current, existing ?? browserSurface(null));
             }
             return upsertSurface(current, singletonSurface(kind));
-          }),
-        ),
+          });
+          return kind === "files" ? { ...next, openFilesOnNewThread: true } : next;
+        }),
       openDevice: (ref, target, automatic = false) =>
         set((state) =>
           (automatic ? automaticUpdate : userAction)(state, scopedThreadKey(ref), (current) => {
@@ -819,34 +852,52 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
           ),
         ),
       close: (ref) =>
-        set((state) =>
-          userAction(state, scopedThreadKey(ref), (current) =>
-            current.isOpen ? { ...current, isOpen: false } : current,
-          ),
-        ),
+        set((state) => {
+          const threadKey = scopedThreadKey(ref);
+          const current = state.byThreadKey[threadKey] ?? EMPTY_THREAD_STATE;
+          if (!current.isOpen) return state;
+          return {
+            ...userAction(state, threadKey, (entry) => ({ ...entry, isOpen: false })),
+            openFilesOnNewThread: false,
+          };
+        }),
       toggleVisibility: (ref) =>
-        set((state) =>
-          userAction(state, scopedThreadKey(ref), (current) => ({
-            ...current,
-            isOpen: !current.isOpen,
-          })),
-        ),
+        set((state) => {
+          const threadKey = scopedThreadKey(ref);
+          const current = state.byThreadKey[threadKey] ?? EMPTY_THREAD_STATE;
+          const nextOpen = !current.isOpen;
+          return {
+            ...userAction(state, threadKey, (entry) => ({
+              ...entry,
+              isOpen: nextOpen,
+            })),
+            ...(nextOpen ? {} : { openFilesOnNewThread: false }),
+          };
+        }),
       toggle: (ref, kind) =>
-        set((state) =>
-          userAction(state, scopedThreadKey(ref), (current) => {
-            const active = current.surfaces.find(
-              (surface) => surface.id === current.activeSurfaceId,
+        set((state) => {
+          const threadKey = scopedThreadKey(ref);
+          const current = state.byThreadKey[threadKey] ?? EMPTY_THREAD_STATE;
+          const active = current.surfaces.find((surface) => surface.id === current.activeSurfaceId);
+          const closingActiveKind = current.isOpen && active?.kind === kind;
+          const next = userAction(state, threadKey, (entry) => {
+            const activeSurface = entry.surfaces.find(
+              (surface) => surface.id === entry.activeSurfaceId,
             );
-            if (current.isOpen && active?.kind === kind) {
-              return { ...current, isOpen: false };
+            if (entry.isOpen && activeSurface?.kind === kind) {
+              return { ...entry, isOpen: false };
             }
             if (kind === "preview") {
-              const existing = current.surfaces.find((surface) => surface.kind === "preview");
-              return upsertSurface(current, existing ?? browserSurface(null));
+              const existing = entry.surfaces.find((surface) => surface.kind === "preview");
+              return upsertSurface(entry, existing ?? browserSurface(null));
             }
-            return upsertSurface(current, singletonSurface(kind));
-          }),
-        ),
+            return upsertSurface(entry, singletonSurface(kind));
+          });
+          if (kind === "files" && !closingActiveKind) {
+            return { ...next, openFilesOnNewThread: true };
+          }
+          return next;
+        }),
       removeThread: (ref) =>
         set((state) => {
           const threadKey = scopedThreadKey(ref);
@@ -874,6 +925,7 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
             ([threadKey]) => !isPullRequestsPanelKey(threadKey),
           ),
         ),
+        openFilesOnNewThread: state.openFilesOnNewThread,
       }),
       migrate: migratePersistedRightPanelState,
     },

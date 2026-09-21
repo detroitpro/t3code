@@ -97,7 +97,7 @@ help menu:
 	@printf '  $(C_CYAN)$(C_BOLD)sync$(C_RESET)               Fetch + merge $(C_DIM)upstream/main$(C_RESET) into this branch\n'
 	@printf '  $(C_RED)$(C_BOLD)clean$(C_RESET)              Remove node_modules / dist caches\n'
 	@printf '\n'
-	@printf '  $(C_DIM)Checkout: $(GIT_REF)$(C_RESET)\n'
+	@printf '  $(C_DIM)Checkout: %s$(C_RESET)\n' "$(GIT_REF)"
 	@printf '  $(C_DIM)Fork only · see FORK.md · never PR against pingdotgg/t3code$(C_RESET)\n\n'
 
 # -----------------------------------------------------------------------------

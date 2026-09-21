@@ -14,8 +14,18 @@ git push origin main
 
 ```bash
 make              # colorized menu
-make i            # install this checkout as local AppImage (alias: make install)
-make bootstrap    # check Node / vp / apt deps (alias: make b, make doctor)
+make i            # install this checkout as local AppImage
+make deps         # vp i
+make dev          # web + server (alias: make d)
+make share        # dev --share
+make desktop      # Electron + server
+make fmt lint tc  # format / lint / typecheck
+make test ARGS=apps/web/src/rightPanelStore.test.ts
+make dist         # AppImage only → release/
+make sync         # fetch + merge upstream/main
+make bootstrap    # check Node / vp / apt (alias: make b, make doctor)
+make pair         # mint pairing token
+make clean
 ```
 
 ## Workstation bootstrap
@@ -23,8 +33,8 @@ make bootstrap    # check Node / vp / apt deps (alias: make b, make doctor)
 ```bash
 make bootstrap
 ./scripts/dev-bootstrap-local.sh --fix   # sudo apt-install missing build deps
-vp i
-vp run dev                                # use the printed pairing URL
+make deps
+make dev                                  # use the printed pairing URL
 ```
 
 Worktree state lives in this checkout's `.t3/`. Do not point a dev server at

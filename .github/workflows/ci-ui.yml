@@ -66,6 +66,7 @@ jobs:
 
   test:
     name: UI Test
+    needs: check
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:

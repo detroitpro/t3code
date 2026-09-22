@@ -216,6 +216,12 @@ import { PullRequestDetailPanel } from "./pullRequest/PullRequestDetailPanel";
 import { PullRequestDetailGhost } from "./pullRequest/PullRequestGhosts";
 import { PullRequestsUnavailableState } from "./pullRequest/PullRequestsUnavailableState";
 import { RightPanelTabs } from "./RightPanelTabs";
+import {
+  clampDockedTerminalHeight,
+  rightSidebarColumnOpen,
+  terminalDockFillsColumn,
+} from "./RightSidebarStack.logic";
+import { RightSidebarStack } from "./RightSidebarStack";
 import { AgentsPanel } from "./AgentsPanel";
 import { LinkPullRequestDialogHost } from "./pullRequest/LinkPullRequestDialog";
 import { ThreadPullRequestsPanel } from "./pullRequest/ThreadPullRequestsPanel";
@@ -889,6 +895,10 @@ interface PersistentThreadTerminalDrawerProps {
   threadRef: { environmentId: EnvironmentId; threadId: ThreadId };
   threadId: ThreadId;
   active: boolean;
+  /** Fill the parent column instead of using a fixed drawer height. */
+  fillAvailable?: boolean;
+  /** Caps height when stacked under the right-panel surface. */
+  maxHeight?: number;
   launchContext: PersistentTerminalLaunchContext | null;
   focusRequestId: number;
   splitShortcutLabel: string | undefined;
@@ -903,6 +913,8 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
   threadRef,
   threadId,
   active,
+  fillAvailable = false,
+  maxHeight,
   launchContext,
   focusRequestId,
   splitShortcutLabel,
@@ -1218,7 +1230,8 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
   return (
     <div
       className={cn(
-        "grid shrink-0 overflow-clip",
+        "grid overflow-clip",
+        fillAvailable && visible ? "min-h-0 flex-1" : "shrink-0",
         active ? (visible ? "grid-rows-[1fr]" : "grid-rows-[0fr]") : "hidden",
         active &&
           "[[data-panel-animations=true]_&]:transition-[grid-template-rows] [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-out",
@@ -1233,7 +1246,9 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
           worktreePath={effectiveWorktreePath}
           runtimeEnv={runtimeEnv}
           visible={visible}
-          height={terminalUiState.terminalHeight}
+          fillAvailable={fillAvailable && visible}
+          {...(maxHeight !== undefined ? { maxHeight } : {})}
+          height={fillAvailable ? 0 : terminalUiState.terminalHeight}
           // Known-session order is MRU and changes on focus; persisted store order keeps sidebar labels stable.
           terminalIds={terminalUiState.terminalIds}
           activeTerminalId={terminalUiState.activeTerminalId}
@@ -2081,6 +2096,24 @@ export default function ChatView(props: ChatViewProps) {
   const rightPanelMaximized =
     canMaximizeRightPanel && maximizedRightPanelThreadKey === routeThreadKey;
   const inlineRightPanelOwnsTitleBar = rightPanelOpen && !shouldUseRightPanelSheet;
+  const [sidebarColumnHeight, setSidebarColumnHeight] = useState(0);
+  const onSidebarColumnHeightChange = useCallback((height: number) => {
+    setSidebarColumnHeight((current) => (current === height ? current : height));
+  }, []);
+  const dockTerminalInSidebar = !shouldUseRightPanelSheet;
+  const inlineSidebarColumnOpen = rightSidebarColumnOpen({
+    rightPanelOpen,
+    terminalOpen: Boolean(terminalUiState.terminalOpen),
+  });
+  const inlineSidebarColumnPresent =
+    dockTerminalInSidebar &&
+    activeThreadRef !== null &&
+    (rightPanelPresent || activeTerminalDrawerPresence.present);
+  const terminalDockFillAvailable = terminalDockFillsColumn({ rightPanelOpen });
+  const dockedTerminalMaxHeight =
+    dockTerminalInSidebar && rightPanelOpen && sidebarColumnHeight > 0
+      ? clampDockedTerminalHeight(Number.POSITIVE_INFINITY, sidebarColumnHeight)
+      : undefined;
 
   useEffect(() => {
     if (!activeThreadRef) return;
@@ -10316,71 +10349,114 @@ export default function ChatView(props: ChatViewProps) {
         </div>
         {/* end horizontal flex container */}
 
-        {mountedTerminalThreadRefs.map(({ key: mountedThreadKey, threadRef: mountedThreadRef }) => (
-          <PersistentThreadTerminalDrawer
-            key={mountedThreadKey}
-            threadRef={mountedThreadRef}
-            threadId={mountedThreadRef.threadId}
-            active={mountedThreadKey === activeThreadKey}
-            launchContext={
-              mountedThreadKey === activeThreadKey ? (activeTerminalLaunchContext ?? null) : null
-            }
-            focusRequestId={mountedThreadKey === activeThreadKey ? terminalFocusRequestId : 0}
-            splitShortcutLabel={splitTerminalShortcutLabel ?? undefined}
-            splitVerticalShortcutLabel={splitTerminalVerticalShortcutLabel ?? undefined}
-            newShortcutLabel={newTerminalShortcutLabel ?? undefined}
-            closeShortcutLabel={closeTerminalShortcutLabel ?? undefined}
-            keybindings={keybindings}
-            onAddTerminalContext={addTerminalContextToDraft}
-          />
-        ))}
+        {shouldUseRightPanelSheet
+          ? mountedTerminalThreadRefs.map(
+              ({ key: mountedThreadKey, threadRef: mountedThreadRef }) => (
+                <PersistentThreadTerminalDrawer
+                  key={mountedThreadKey}
+                  threadRef={mountedThreadRef}
+                  threadId={mountedThreadRef.threadId}
+                  active={mountedThreadKey === activeThreadKey}
+                  launchContext={
+                    mountedThreadKey === activeThreadKey
+                      ? (activeTerminalLaunchContext ?? null)
+                      : null
+                  }
+                  focusRequestId={mountedThreadKey === activeThreadKey ? terminalFocusRequestId : 0}
+                  splitShortcutLabel={splitTerminalShortcutLabel ?? undefined}
+                  splitVerticalShortcutLabel={splitTerminalVerticalShortcutLabel ?? undefined}
+                  newShortcutLabel={newTerminalShortcutLabel ?? undefined}
+                  closeShortcutLabel={closeTerminalShortcutLabel ?? undefined}
+                  keybindings={keybindings}
+                  onAddTerminalContext={addTerminalContextToDraft}
+                />
+              ),
+            )
+          : null}
       </div>
 
-      {rightPanelPresent && !shouldUseRightPanelSheet && activeThreadRef ? (
-        <RightPanelTabs
-          mode="inline"
-          widthStorageKey={`t3code:preview-panel-width:${activeThreadKey}`}
-          open={rightPanelOpen}
+      {inlineSidebarColumnPresent && activeThreadRef ? (
+        <RightSidebarStack
+          open={inlineSidebarColumnOpen}
           maximized={rightPanelMaximized}
-          surfaces={renderedRightPanelSurfaces}
-          environmentId={activeThreadRef.environmentId}
-          activeSurfaceId={renderedRightPanelSurface?.id ?? null}
-          pendingSurfaceIds={pendingFileSurfaceIds}
-          previewSessions={activePreviewState.sessions}
-          desktopByTabId={activePreviewState.desktopByTabId}
-          previewRuntimeTabId={resolvePreviewRuntimeTabId}
-          terminalLabelsById={activeTerminalLabelsById}
-          onActivate={activateRightPanelSurface}
-          onCloseSurface={closeRightPanelSurface}
-          onRenameDevice={(surfaceId, title) => {
-            if (activeThreadRef)
-              useRightPanelStore.getState().renameDevice(activeThreadRef, surfaceId, title);
-          }}
-          onCloseOtherSurfaces={closeOtherRightPanelSurfaces}
-          onCloseSurfacesToRight={closeRightPanelSurfacesToRight}
-          onCloseAllSurfaces={closeAllRightPanelSurfaces}
-          onCopyFilePath={copyRightPanelFilePath}
-          onAddBrowser={() => createBrowserSurface()}
-          onAddBrowserInProfile={createBrowserSurface}
-          onAddTerminal={addTerminalSurface}
-          onAddDiff={addDiffSurface}
-          onAddFiles={addFilesSurface}
-          onAddPullRequest={addPullRequestSurface}
-          onAddPullRequests={addPullRequestsSurface}
-          onAddAgents={addAgentsSurface}
-          onAddDevice={addDeviceSurface}
-          browserAvailable={isPreviewSupportedInRuntime()}
-          terminalAvailable={activeProject !== null}
-          diffAvailable={isServerThread && isGitRepo}
-          filesAvailable={activeProject !== null}
-          pullRequestAvailable={pullRequestSurfaceAvailable}
-          pullRequestsAvailable={pullRequestsSurfaceAvailable}
-          agentsAvailable
-          deviceAvailable={activeThreadRef !== null}
-          liveAgentCount={agentPanelModel.liveCount}
-        >
-          {rightPanelContent}
-        </RightPanelTabs>
+          widthStorageKey={`t3code:preview-panel-width:${activeThreadKey}`}
+          panelOpen={rightPanelOpen}
+          onColumnHeightChange={onSidebarColumnHeightChange}
+          panel={
+            rightPanelPresent ? (
+              <RightPanelTabs
+                mode="inline"
+                withoutShell
+                open={rightPanelOpen}
+                maximized={rightPanelMaximized}
+                surfaces={renderedRightPanelSurfaces}
+                environmentId={activeThreadRef.environmentId}
+                activeSurfaceId={renderedRightPanelSurface?.id ?? null}
+                pendingSurfaceIds={pendingFileSurfaceIds}
+                previewSessions={activePreviewState.sessions}
+                desktopByTabId={activePreviewState.desktopByTabId}
+                previewRuntimeTabId={resolvePreviewRuntimeTabId}
+                terminalLabelsById={activeTerminalLabelsById}
+                onActivate={activateRightPanelSurface}
+                onCloseSurface={closeRightPanelSurface}
+                onRenameDevice={(surfaceId, title) => {
+                  if (activeThreadRef)
+                    useRightPanelStore.getState().renameDevice(activeThreadRef, surfaceId, title);
+                }}
+                onCloseOtherSurfaces={closeOtherRightPanelSurfaces}
+                onCloseSurfacesToRight={closeRightPanelSurfacesToRight}
+                onCloseAllSurfaces={closeAllRightPanelSurfaces}
+                onCopyFilePath={copyRightPanelFilePath}
+                onAddBrowser={() => createBrowserSurface()}
+                onAddBrowserInProfile={createBrowserSurface}
+                onAddTerminal={addTerminalSurface}
+                onAddDiff={addDiffSurface}
+                onAddFiles={addFilesSurface}
+                onAddPullRequest={addPullRequestSurface}
+                onAddPullRequests={addPullRequestsSurface}
+                onAddAgents={addAgentsSurface}
+                onAddDevice={addDeviceSurface}
+                browserAvailable={isPreviewSupportedInRuntime()}
+                terminalAvailable={activeProject !== null}
+                diffAvailable={isServerThread && isGitRepo}
+                filesAvailable={activeProject !== null}
+                pullRequestAvailable={pullRequestSurfaceAvailable}
+                pullRequestsAvailable={pullRequestsSurfaceAvailable}
+                agentsAvailable
+                deviceAvailable={activeThreadRef !== null}
+                liveAgentCount={agentPanelModel.liveCount}
+              >
+                {rightPanelContent}
+              </RightPanelTabs>
+            ) : null
+          }
+          dock={mountedTerminalThreadRefs.map(
+            ({ key: mountedThreadKey, threadRef: mountedThreadRef }) => (
+              <PersistentThreadTerminalDrawer
+                key={mountedThreadKey}
+                threadRef={mountedThreadRef}
+                threadId={mountedThreadRef.threadId}
+                active={mountedThreadKey === activeThreadKey}
+                fillAvailable={terminalDockFillAvailable}
+                {...(dockedTerminalMaxHeight !== undefined
+                  ? { maxHeight: dockedTerminalMaxHeight }
+                  : {})}
+                launchContext={
+                  mountedThreadKey === activeThreadKey
+                    ? (activeTerminalLaunchContext ?? null)
+                    : null
+                }
+                focusRequestId={mountedThreadKey === activeThreadKey ? terminalFocusRequestId : 0}
+                splitShortcutLabel={splitTerminalShortcutLabel ?? undefined}
+                splitVerticalShortcutLabel={splitTerminalVerticalShortcutLabel ?? undefined}
+                newShortcutLabel={newTerminalShortcutLabel ?? undefined}
+                closeShortcutLabel={closeTerminalShortcutLabel ?? undefined}
+                keybindings={keybindings}
+                onAddTerminalContext={addTerminalContextToDraft}
+              />
+            ),
+          )}
+        />
       ) : null}
       {rightPanelPresent && shouldUseRightPanelSheet && activeThreadRef ? (
         <RightPanelSheet

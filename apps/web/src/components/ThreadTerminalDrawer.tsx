@@ -98,10 +98,15 @@ function maxDrawerHeight(): number {
   return Math.max(MIN_DRAWER_HEIGHT, Math.floor(window.innerHeight * MAX_DRAWER_HEIGHT_RATIO));
 }
 
-function clampDrawerHeight(height: number): number {
+function clampDrawerHeight(height: number, maxHeight?: number): number {
   const safeHeight = Number.isFinite(height) ? height : DEFAULT_THREAD_TERMINAL_HEIGHT;
-  const maxHeight = maxDrawerHeight();
-  return Math.min(Math.max(Math.round(safeHeight), MIN_DRAWER_HEIGHT), maxHeight);
+  const windowMax = maxDrawerHeight();
+  const maxHeightBound =
+    maxHeight !== undefined && Number.isFinite(maxHeight)
+      ? Math.max(MIN_DRAWER_HEIGHT, Math.floor(maxHeight))
+      : windowMax;
+  const effectiveMax = Math.min(windowMax, maxHeightBound);
+  return Math.min(Math.max(Math.round(safeHeight), MIN_DRAWER_HEIGHT), effectiveMax);
 }
 
 function writeSystemMessage(terminal: GhosttyTerminalSurface, message: string): void {
@@ -988,6 +993,13 @@ export function TerminalViewport({
 
 interface ThreadTerminalDrawerProps {
   mode?: "drawer" | "panel";
+  /**
+   * When true with drawer mode, the terminal fills its parent instead of using
+   * a fixed pixel height (right-sidebar column with the surface panel closed).
+   */
+  fillAvailable?: boolean;
+  /** Caps drawer height when stacked under the right-panel surface. */
+  maxHeight?: number;
   threadRef: ScopedThreadRef;
   threadId: ThreadId;
   cwd: string;
@@ -1049,6 +1061,8 @@ function TerminalActionButton({ label, className, onClick, children }: TerminalA
 
 export default function ThreadTerminalDrawer({
   mode = "drawer",
+  fillAvailable = false,
+  maxHeight,
   threadRef,
   threadId,
   cwd,
@@ -1077,12 +1091,13 @@ export default function ThreadTerminalDrawer({
   terminalLaunchLocationsById,
 }: ThreadTerminalDrawerProps) {
   const isPanel = mode === "panel";
+  const useFillHeight = isPanel || fillAvailable;
   const [advancedTypography] = useLocalStorage(
     TYPOGRAPHY_ADVANCED_STORAGE_KEY,
     false,
     Schema.Boolean,
   );
-  const controlledDrawerHeight = clampDrawerHeight(height);
+  const controlledDrawerHeight = clampDrawerHeight(height, maxHeight);
   const [drawerHeightState, setDrawerHeightState] = useState(() => ({
     threadId,
     height: controlledDrawerHeight,
@@ -1295,12 +1310,15 @@ export default function ThreadTerminalDrawer({
     drawerHeightRef.current = drawerHeight;
   }, [drawerHeight]);
 
-  const syncHeight = useCallback((nextHeight: number) => {
-    const clampedHeight = clampDrawerHeight(nextHeight);
-    if (lastSyncedHeightRef.current === clampedHeight) return;
-    lastSyncedHeightRef.current = clampedHeight;
-    onHeightChangeRef.current(clampedHeight);
-  }, []);
+  const syncHeight = useCallback(
+    (nextHeight: number) => {
+      const clampedHeight = clampDrawerHeight(nextHeight, maxHeight);
+      if (lastSyncedHeightRef.current === clampedHeight) return;
+      lastSyncedHeightRef.current = clampedHeight;
+      onHeightChangeRef.current(clampedHeight);
+    },
+    [maxHeight],
+  );
 
   useEffect(() => {
     lastSyncedHeightRef.current = controlledDrawerHeight;
@@ -1325,6 +1343,7 @@ export default function ThreadTerminalDrawer({
       event.preventDefault();
       const clampedHeight = clampDrawerHeight(
         resizeState.startHeight + (resizeState.startY - event.clientY),
+        maxHeight,
       );
       if (clampedHeight === drawerHeightRef.current) {
         return;
@@ -1333,7 +1352,7 @@ export default function ThreadTerminalDrawer({
       drawerHeightRef.current = clampedHeight;
       setDrawerHeight(clampedHeight);
     },
-    [setDrawerHeight],
+    [maxHeight, setDrawerHeight],
   );
 
   const handleResizePointerEnd = useCallback(
@@ -1359,7 +1378,7 @@ export default function ThreadTerminalDrawer({
     }
 
     const onWindowResize = () => {
-      const clampedHeight = clampDrawerHeight(drawerHeightRef.current);
+      const clampedHeight = clampDrawerHeight(drawerHeightRef.current, maxHeight);
       const changed = clampedHeight !== drawerHeightRef.current;
       if (changed) {
         setDrawerHeightFromWindowResize(clampedHeight);
@@ -1374,7 +1393,22 @@ export default function ThreadTerminalDrawer({
     return () => {
       window.removeEventListener("resize", onWindowResize);
     };
-  }, [syncHeight, visible]);
+  }, [maxHeight, syncHeight, visible]);
+
+  useEffect(() => {
+    if (!visible || maxHeight === undefined) {
+      return;
+    }
+    const clampedHeight = clampDrawerHeight(drawerHeightRef.current, maxHeight);
+    if (clampedHeight === drawerHeightRef.current) {
+      return;
+    }
+    setDrawerHeightFromWindowResize(clampedHeight);
+    drawerHeightRef.current = clampedHeight;
+    if (!resizeStateRef.current) {
+      syncHeight(clampedHeight);
+    }
+  }, [maxHeight, syncHeight, visible]);
 
   useEffect(() => {
     if (!visible) {
@@ -1395,11 +1429,11 @@ export default function ThreadTerminalDrawer({
         data-terminal-owner={isPanel ? "right-panel" : "drawer"}
         className={cn(
           "thread-terminal-drawer relative flex min-w-0 flex-col overflow-hidden bg-background",
-          isPanel ? "h-full flex-1" : "shrink-0 border-t border-border/80",
+          useFillHeight ? "h-full min-h-0 flex-1" : "shrink-0 border-t border-border/80",
         )}
-        style={isPanel ? undefined : { height: `${drawerHeight}px` }}
+        style={useFillHeight ? undefined : { height: `${drawerHeight}px` }}
       >
-        {!isPanel ? (
+        {!useFillHeight ? (
           <div
             className="absolute inset-x-0 top-0 z-20 h-1.5 cursor-row-resize"
             onPointerDown={handleResizePointerDown}
@@ -1425,11 +1459,11 @@ export default function ThreadTerminalDrawer({
       data-terminal-owner={isPanel ? "right-panel" : "drawer"}
       className={cn(
         "thread-terminal-drawer relative flex min-w-0 flex-col overflow-hidden bg-background",
-        isPanel ? "h-full flex-1" : "shrink-0 border-t border-border/80",
+        useFillHeight ? "h-full min-h-0 flex-1" : "shrink-0 border-t border-border/80",
       )}
-      style={isPanel ? undefined : { height: `${drawerHeight}px` }}
+      style={useFillHeight ? undefined : { height: `${drawerHeight}px` }}
     >
-      {!isPanel ? (
+      {!useFillHeight ? (
         <div
           className="absolute inset-x-0 top-0 z-20 h-1.5 cursor-row-resize"
           onPointerDown={handleResizePointerDown}

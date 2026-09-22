@@ -131,6 +131,13 @@ shortcut such as `alt+w`.
 Many defaults include `!terminalFocus` so they do not intercept terminal input.
 Keep that condition when remapping them if you want the same behavior.
 
+## Desktop application menu
+
+T3 Code draws its own titlebar, so on Windows and Linux the File / Edit / View /
+Window / Help menus have no menubar strip to live in. Tap `Alt` and release it
+without pressing anything else to open the menu below the titlebar. macOS keeps
+the usual system menu bar.
+
 ## Desktop quit shortcut
 
 Use `Cmd+Q` on macOS or `Ctrl+Q` on Windows and Linux. In the default **Hold** mode,

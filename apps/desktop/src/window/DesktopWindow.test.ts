@@ -183,6 +183,7 @@ const desktopServerExposureLayer = Layer.succeed(DesktopServerExposure.DesktopSe
 
 const electronMenuLayer = Layer.succeed(ElectronMenu.ElectronMenu, {
   setApplicationMenu: () => Effect.void,
+  popupApplicationMenu: () => Effect.void,
   popupTemplate: () => Effect.void,
   showContextMenu: () => Effect.succeed(Option.none()),
 } satisfies ElectronMenu.ElectronMenu["Service"]);
@@ -293,6 +294,7 @@ function makeTestLayer(input: {
         electronAppLayer,
         Layer.succeed(ElectronMenu.ElectronMenu, {
           setApplicationMenu: () => Effect.void,
+          popupApplicationMenu: () => Effect.void,
           showContextMenu: () => Effect.succeed(Option.none()),
           popupTemplate: input.onPopupTemplate ?? (() => Effect.void),
         }),

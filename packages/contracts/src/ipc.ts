@@ -1117,6 +1117,25 @@ export const DesktopPreviewAutomationWaitForInputSchema = Schema.Struct({
 export const SystemSettingsPaneSchema = Schema.Literals(["full-disk-access"]);
 export type SystemSettingsPane = typeof SystemSettingsPaneSchema.Type;
 
+/**
+ * A desktop-only shell command the in-window menu bar can run. The renderer
+ * draws the menu but cannot reload, zoom, or quit the shell itself, so it names
+ * one of these instead; the main process refuses anything outside the union.
+ */
+export const DesktopAppCommandSchema = Schema.Literals([
+  "reload",
+  "force-reload",
+  "toggle-dev-tools",
+  "zoom-in",
+  "zoom-out",
+  "zoom-reset",
+  "toggle-fullscreen",
+  "close-window",
+  "quit",
+  "check-for-updates",
+]);
+export type DesktopAppCommand = typeof DesktopAppCommandSchema.Type;
+
 export interface DesktopBridge {
   getAppBranding: () => DesktopAppBranding | null;
   /** Absolute path of a dropped or picked file; absent on desktop builds predating it. */
@@ -1223,6 +1242,8 @@ export interface DesktopBridge {
   /** Present when the desktop shell can perform an ordered plain-text paste. */
   pasteAsText?: () => Promise<void>;
   onMenuAction: (listener: (action: string) => void) => () => void;
+  /** Runs a shell command on behalf of the renderer-drawn menu bar. */
+  runAppCommand: (command: DesktopAppCommand) => Promise<void>;
   onSnapShotEvent?: (listener: (event: DesktopSnapShotEvent) => void) => () => void;
   /**
    * Quit-confirmation hint pushes. Optional: older desktop builds never emit

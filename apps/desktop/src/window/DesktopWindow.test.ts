@@ -183,7 +183,6 @@ const desktopServerExposureLayer = Layer.succeed(DesktopServerExposure.DesktopSe
 
 const electronMenuLayer = Layer.succeed(ElectronMenu.ElectronMenu, {
   setApplicationMenu: () => Effect.void,
-  popupApplicationMenu: () => Effect.void,
   popupTemplate: () => Effect.void,
   showContextMenu: () => Effect.succeed(Option.none()),
 } satisfies ElectronMenu.ElectronMenu["Service"]);
@@ -294,7 +293,6 @@ function makeTestLayer(input: {
         electronAppLayer,
         Layer.succeed(ElectronMenu.ElectronMenu, {
           setApplicationMenu: () => Effect.void,
-          popupApplicationMenu: () => Effect.void,
           showContextMenu: () => Effect.succeed(Option.none()),
           popupTemplate: input.onPopupTemplate ?? (() => Effect.void),
         }),
@@ -762,8 +760,9 @@ describe("DesktopWindow", () => {
           yield* desktopWindow.zoomMain(direction);
           const position = fakeWindow.setWindowButtonPosition.mock.lastCall?.[0];
           assert.isDefined(position);
-          // The 14-point native buttons should share the zoomed 52px header's center.
-          const headerCenter = 26 * fakeWindow.window.webContents.getZoomFactor();
+          // The 14-point native buttons should share the zoomed titlebar's center.
+          const headerCenter =
+            (DesktopWindow.TITLEBAR_HEIGHT / 2) * fakeWindow.window.webContents.getZoomFactor();
           assert.isAtMost(Math.abs(position.y + 7 - headerCenter), 0.5);
           assert.equal(position.x, 16);
         }
@@ -775,7 +774,9 @@ describe("DesktopWindow", () => {
 
         fakeWindow.isFullScreen.mockReturnValue(false);
         fakeWindow.windowListeners.get("leave-full-screen")?.();
-        assert.deepEqual(fakeWindow.setWindowButtonPosition.mock.lastCall, [{ x: 16, y: 19 }]);
+        assert.deepEqual(fakeWindow.setWindowButtonPosition.mock.lastCall, [
+          { x: 16, y: DesktopWindow.TITLEBAR_HEIGHT / 2 - 7 },
+        ]);
       }).pipe(Effect.provide(layer));
     }),
   );

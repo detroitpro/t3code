@@ -12,13 +12,13 @@ export interface MenuRevealOptions {
 }
 
 /**
- * Restores the Alt-to-open application menu on the platforms that draw our own
+ * Restores the Alt-to-open menu bar gesture on the platforms that draw our own
  * titlebar. `autoHideMenuBar` asks Electron to paint the menubar into the
  * native frame, and `titleBarStyle: "hidden"` removes the frame that would host
- * it, so Alt has nowhere to draw and the configured menu is unreachable. This
- * watches for the same gesture Chromium uses — Alt pressed and released with no
- * other key in between — and pops the application menu below the titlebar
- * instead.
+ * it, so Alt has nowhere to draw and the menu is unreachable. This watches for
+ * the same gesture Chromium uses — Alt pressed and released with no other key
+ * in between — and `reveal` hands keyboard focus to the in-window menu bar the
+ * renderer draws instead.
  */
 export function makeMenuRevealHandler(
   options: MenuRevealOptions,

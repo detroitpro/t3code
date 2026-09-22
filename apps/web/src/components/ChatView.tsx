@@ -2355,18 +2355,6 @@ export default function ChatView(props: ChatViewProps) {
     useRightPanelStore.getState().reconcileFileSurfaces(activeThreadRef, activeProject !== null);
   }, [activeEnvironmentBootstrapComplete, activeProject, activeThreadRef]);
 
-  useEffect(() => {
-    if (
-      !activeThreadRef ||
-      !clientSettingsHydrated ||
-      shouldUseRightPanelSheet ||
-      activeProject === null
-    ) {
-      return;
-    }
-    useRightPanelStore.getState().seedFilesOnNewThread(activeThreadRef);
-  }, [activeProject, activeThreadRef, clientSettingsHydrated, shouldUseRightPanelSheet]);
-
   // Compute the list of environments this logical project spans, used to
   // drive the environment picker in BranchToolbar.
   const allProjects = useProjects();
@@ -3763,6 +3751,48 @@ export default function ChatView(props: ChatViewProps) {
   const activeProjectCwd = activeProject?.workspaceRoot ?? null;
   const activeThreadWorktreePath = activeThread?.worktreePath ?? null;
   const activeWorkspaceRoot = activeThreadWorktreePath ?? activeProjectCwd ?? undefined;
+  useEffect(() => {
+    if (!activeThreadRef || !clientSettingsHydrated || activeProject === null || !activeThreadId) {
+      return;
+    }
+
+    useRightPanelStore.getState().seedFilesOnNewThread(activeThreadRef);
+
+    const seededTerminal = useTerminalUiStateStore
+      .getState()
+      .seedTerminalOnNewThread(activeThreadRef);
+    if (!seededTerminal) {
+      return;
+    }
+
+    const cwdForOpen = gitCwd ?? activeProject.workspaceRoot;
+    if (!cwdForOpen) {
+      return;
+    }
+
+    void openTerminal({
+      environmentId,
+      input: {
+        threadId: activeThreadId,
+        terminalId: DEFAULT_THREAD_TERMINAL_ID,
+        cwd: cwdForOpen,
+        ...(activeThreadWorktreePath != null ? { worktreePath: activeThreadWorktreePath } : {}),
+        env: projectScriptRuntimeEnv({
+          project: { cwd: activeProject.workspaceRoot },
+          worktreePath: activeThreadWorktreePath,
+        }),
+      },
+    });
+  }, [
+    activeProject,
+    activeThreadId,
+    activeThreadRef,
+    activeThreadWorktreePath,
+    clientSettingsHydrated,
+    environmentId,
+    gitCwd,
+    openTerminal,
+  ]);
   useLayoutEffect(() => {
     if (
       threadDetailLoading ||

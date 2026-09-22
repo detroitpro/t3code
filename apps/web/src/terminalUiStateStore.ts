@@ -569,6 +569,11 @@ interface TerminalUiStateStoreState {
   splitTerminal: (threadRef: ScopedThreadRef, terminalId: string) => void;
   splitTerminalVertical: (threadRef: ScopedThreadRef, terminalId: string) => void;
   newTerminal: (threadRef: ScopedThreadRef, terminalId: string) => void;
+  /**
+   * Open the drawer with the default terminal when this thread has no stored UI
+   * state yet. Returns true when seeding ran so the caller can start a PTY.
+   */
+  seedTerminalOnNewThread: (threadRef: ScopedThreadRef) => boolean;
   ensureTerminal: (
     threadRef: ScopedThreadRef,
     terminalId: string,
@@ -655,6 +660,20 @@ export const useTerminalUiStateStore = create<TerminalUiStateStoreState>()(
             terminalId,
             suppressed: false,
           }),
+        seedTerminalOnNewThread: (threadRef) => {
+          if (threadRef.threadId.length === 0) {
+            return false;
+          }
+          const threadKey = terminalThreadKey(threadRef);
+          if (get().terminalUiStateByThreadKey[threadKey] !== undefined) {
+            return false;
+          }
+          updateTerminal(threadRef, (state) => setThreadTerminalOpen(state, true), {
+            terminalId: DEFAULT_THREAD_TERMINAL_ID,
+            suppressed: false,
+          });
+          return true;
+        },
         ensureTerminal: (threadRef, terminalId, options) =>
           updateTerminal(
             threadRef,

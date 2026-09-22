@@ -28,6 +28,7 @@ import * as PreviewManager from "../preview/Manager.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopClientSettings from "../settings/DesktopClientSettings.ts";
 import * as ElectronApp from "../electron/ElectronApp.ts";
+import { makeMenuRevealHandler } from "./MenuReveal.ts";
 import { makeQuitShortcutHandler } from "./QuitHold.ts";
 
 const TITLEBAR_HEIGHT = 40;
@@ -653,8 +654,26 @@ export const make = Effect.gen(function* () {
         void runPromise(electronApp.quit);
       },
     });
+    // macOS keeps a real system menu bar; every other platform hides the frame
+    // that would host one (see getWindowTitleBarOptions), so Alt has to open
+    // the menu itself.
+    const menuRevealHandler =
+      environment.platform === "darwin"
+        ? undefined
+        : makeMenuRevealHandler({
+            reveal: () => {
+              if (window.isDestroyed()) return;
+              runFork(
+                electronMenu.popupApplicationMenu({
+                  window,
+                  position: { x: 0, y: TITLEBAR_HEIGHT },
+                }),
+              );
+            },
+          });
     window.webContents.on("before-input-event", (event, input) => {
       quitShortcutHandler(event, input);
+      menuRevealHandler?.(input);
       if (input.type !== "keyDown" || !input.isAutoRepeat) return;
       const modifier = environment.platform === "darwin" ? input.meta : input.control;
       if (modifier && !input.alt && !input.shift && input.key.toLowerCase() === "w") {

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ship it"
+  short_description: "Land issue, PR, or WIP as a mergeable pull request"
+  default_prompt: "Use $ship-it to finish this work and land a mergeable PR. Enable auto-merge only if I explicitly asked."

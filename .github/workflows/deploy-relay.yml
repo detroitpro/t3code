@@ -1,9 +1,8 @@
 name: Deploy T3 Connect relay
 
+# Fork: disabled. T3 Connect relay deploy is out of scope (issue #21).
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
   contents: read

@@ -1,14 +1,8 @@
 name: Forward to Cursor hygiene
 
+# Fork: disabled. Upstream Cursor hygiene webhook is out of scope (issue #21).
 on:
-  push:
-    branches: [main]
-  pull_request:
-    types: [opened, reopened, ready_for_review]
-  issues:
-    types: [opened, closed, reopened]
-  discussion:
-    types: [created, closed, reopened]
+  workflow_dispatch:
 
 permissions:
   contents: read

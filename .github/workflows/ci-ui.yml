@@ -1,0 +1,94 @@
+# Fork UI CI for detroitpro/t3code.
+# Required status check names: "UI Check", "UI Test"
+# Upstream product pipelines stay disabled; see issue #21.
+
+name: CI UI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-ui-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: UI Check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+
+      - name: Reject repository-owned PR assets
+        run: |
+          files="$(git ls-files .github/pr-assets)"
+          if test -n "$files"; then
+            printf 'PR evidence must be uploaded to GitHub, not committed:\n%s\n' "$files" >&2
+            exit 1
+          fi
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: true
+
+      - name: Check className overrides on components/ui do not grow
+        run: vp run lint:restyle-ceiling
+
+      - name: Format
+        run: vp fmt --check
+
+      - name: Lint
+        run: vp lint --report-unused-disable-directives
+
+      - name: Typecheck UI packages
+        run: >-
+          vp run
+          --filter @t3tools/web
+          --filter @t3tools/client-runtime
+          --filter @t3tools/contracts
+          --filter @t3tools/shared
+          typecheck
+
+  test:
+    name: UI Test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: true
+
+      - name: Test UI packages
+        run: >-
+          vp run --parallel --concurrency-limit 4
+          --filter @t3tools/web
+          --filter @t3tools/client-runtime
+          --filter @t3tools/contracts
+          --filter @t3tools/shared
+          test

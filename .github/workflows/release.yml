@@ -1,14 +1,7 @@
 name: Release
 
+# Fork: no scheduled/tag releases. Manual dispatch only; do not publish as upstream (issue #21).
 on:
-  push:
-    tags:
-      - "v*.*.*"
-      - "!v*-nightly.*"
-      - "!v*-preview.*"
-  schedule:
-    # Avoid minute zero, when GitHub scheduled jobs are busiest.
-    - cron: "8,38 * * * *"
   workflow_dispatch:
     inputs:
       channel:

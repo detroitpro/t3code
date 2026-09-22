@@ -11,14 +11,12 @@ name: Mobile Fingerprint Check
 # The check is advisory: it always passes, the label is the signal. Both
 # fingerprints are computed in this one job (same OS, same corepack-pinned
 # pnpm), so the comparison is self-consistent; no EXPO_TOKEN needed.
+# Fork: disabled. Mobile native fingerprint gating is out of scope (issue #21).
 on:
-  pull_request:
-    # Run even when a rebase or base change removes every native input from the
-    # diff, so the label can be cleared without installing Expo dependencies.
-    types: [opened, synchronize, reopened, edited]
+  workflow_dispatch:
 
 concurrency:
-  group: mobile-fingerprint-check-${{ github.event.pull_request.number }}
+  group: mobile-fingerprint-check-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 jobs:

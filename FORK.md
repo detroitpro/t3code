@@ -1,7 +1,11 @@
 # Fork-only notes (`detroitpro/t3code`)
 
-This fork tracks personal work that is **not** proposed upstream. Never open
-PRs against `pingdotgg/t3code`. Keep `main` current with:
+This fork tracks personal work that is **not** proposed elsewhere. Never open
+PRs, issues, or discussions against any other GitHub copy of T3 Code. GitHub
+work happens only on [`detroitpro/t3code`](https://github.com/detroitpro/t3code).
+
+Keep `main` current with the `upstream` **git** remote (fetch/merge only — never
+use that remote’s GitHub issues, PRs, or discussions):
 
 ```bash
 git fetch upstream
@@ -9,6 +13,10 @@ git checkout main
 git merge upstream/main   # or rebase
 git push origin main
 ```
+
+If `upstream` is missing, add it once with `git remote add upstream <fork-source-url>`
+(the URL already configured on this machine’s remote is fine; agents must not link
+or operate on that GitHub repo beyond git sync when asked).
 
 ## Primary human CLI: `make`
 

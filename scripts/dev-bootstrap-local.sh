@@ -172,7 +172,7 @@ Build + install a clickable local AppImage (taskbar):
   vp run install:desktop:local        # builds then installs
   # or: ./scripts/install-local-appimage.sh --help
 
-See FORK.md for the fork-only workflow (no PRs against pingdotgg/t3code).
+See FORK.md for the fork-only workflow (GitHub work on detroitpro/t3code only).
 EOF
 
 [[ "$fail" -eq 0 ]] || exit 1

@@ -1,0 +1,29 @@
+---
+description: Fork-only GitHub — never target pingdotgg/t3code
+alwaysApply: true
+---
+
+# Fork GitHub boundary
+
+This checkout is the **detroitpro/t3code** fork. Personal work is tracked here only.
+
+## Hard rule
+
+**Never** use `https://github.com/pingdotgg/t3code` (or `pingdotgg/t3code`) for:
+
+- `gh` / GitHub API (`-R`, clone URLs for issues/PRs, discussion create/comment)
+- Opening or linking issues, PRs, discussions, or release pages in replies
+- Prefill `issues/new` URLs, Ideas discussions, or triage filing
+- Docs, README, CONTRIBUTING, playbooks, or agent guidance you edit
+
+**Always** use `https://github.com/detroitpro/t3code` (or `detroitpro/t3code` / `origin`).
+
+## Allowed exception
+
+`git fetch upstream` / `git merge upstream/main` (or rebase) solely to sync the fork, when the user asked to sync. Do not browse, comment, or create anything on that remote’s GitHub UI/API.
+
+## If you already targeted pingdotgg
+
+1. Stop.
+2. Retract or redirect to the equivalent `detroitpro/t3code` artifact.
+3. Prefer creating the correct issue/PR/discussion on the fork immediately.

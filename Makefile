@@ -98,7 +98,7 @@ help menu:
 	@printf '  $(C_RED)$(C_BOLD)clean$(C_RESET)              Remove node_modules / dist caches\n'
 	@printf '\n'
 	@printf '  $(C_DIM)Checkout: %s$(C_RESET)\n' "$(GIT_REF)"
-	@printf '  $(C_DIM)Fork only · see FORK.md · never PR against pingdotgg/t3code$(C_RESET)\n\n'
+	@printf '  $(C_DIM)Fork only · see FORK.md · GitHub work on detroitpro/t3code only$(C_RESET)\n\n'
 
 # -----------------------------------------------------------------------------
 # Install / workstation
@@ -225,7 +225,7 @@ sync-upstream:
 	$(BANNER)
 	$(call STEP,$(C_CYAN),sync,fetch upstream + merge upstream/main)
 	@git -C "$(ROOT)" remote get-url upstream >/dev/null 2>&1 || { \
-		printf '  $(C_RED)no upstream remote$(C_RESET) — add: git remote add upstream https://github.com/pingdotgg/t3code\n'; \
+		printf '  $(C_RED)no upstream remote$(C_RESET) — configure git remote upstream for sync (see FORK.md)\n'; \
 		exit 1; \
 	}
 	@git -C "$(ROOT)" fetch upstream

@@ -217,7 +217,7 @@ import { PullRequestDetailGhost } from "./pullRequest/PullRequestGhosts";
 import { PullRequestsUnavailableState } from "./pullRequest/PullRequestsUnavailableState";
 import { RightPanelTabs } from "./RightPanelTabs";
 import {
-  clampDockedTerminalHeight,
+  maxDockedTerminalHeight,
   rightSidebarColumnOpen,
   terminalDockFillsColumn,
 } from "./RightSidebarStack.logic";
@@ -2111,7 +2111,7 @@ export default function ChatView(props: ChatViewProps) {
   const terminalDockFillAvailable = terminalDockFillsColumn({ rightPanelOpen });
   const dockedTerminalMaxHeight =
     dockTerminalInSidebar && rightPanelOpen && sidebarColumnHeight > 0
-      ? clampDockedTerminalHeight(Number.POSITIVE_INFINITY, sidebarColumnHeight)
+      ? maxDockedTerminalHeight(sidebarColumnHeight)
       : undefined;
 
   useEffect(() => {

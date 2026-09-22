@@ -34,6 +34,7 @@ import { useRemoteOpenState } from "~/remoteOpen";
 import { useClientSettings, useUpdateClientSettings } from "~/hooks/useSettings";
 import { useTheme } from "~/hooks/useTheme";
 import { getLocalStorageItem, setLocalStorageItem, useLocalStorage } from "~/hooks/useLocalStorage";
+import { useResizableWidth } from "~/hooks/useResizableWidth";
 import { useWorkspaceMutationRefresh } from "~/hooks/useWorkspaceMutationRefresh";
 import { resolveDiffThemeName } from "~/lib/diffRendering";
 import { PREFERRED_HIGHLIGHTER } from "~/lib/syntaxHighlighting";
@@ -50,6 +51,7 @@ import { previewEnvironment } from "~/state/preview";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { useAtomQueryRunner } from "~/state/use-atom-query-runner";
 
+import { RightPanelResizeHandle } from "../preview/RightPanelResizeHandle";
 import { AttachmentFilePreview } from "./AttachmentFilePreview";
 import { AudioPreview } from "./AudioPreview";
 import { BrowserDocumentFrame, isPdfPreviewFile } from "./BrowserDocumentFrame";
@@ -110,6 +112,11 @@ interface FilePreviewPanelProps {
 }
 
 const FILE_EXPLORER_STORAGE_KEY = "t3code.fileExplorerOpen";
+const FILE_EXPLORER_WIDTH_STORAGE_KEY = "t3code.fileExplorerWidth";
+/** Matches the previous fixed `w-[min(22rem,46%)]` default (~352px). */
+const FILE_EXPLORER_DEFAULT_WIDTH = 352;
+const FILE_EXPLORER_MIN_WIDTH = 256;
+const FILE_EXPLORER_MAX_WIDTH = 560;
 const RENDER_MARKDOWN_STORAGE_KEY = "t3code.renderMarkdown";
 const RENDER_BROWSER_FILE_STORAGE_KEY = "t3code.renderBrowserFile";
 const RENDER_TABLE_STORAGE_KEY = "t3code.renderTable";
@@ -960,6 +967,14 @@ export default function FilePreviewPanel({
     explorerOpen,
     attachmentOpen: attachment !== undefined,
   });
+  const resizableExplorer = showExplorer && previewPath !== null;
+  const { width: explorerWidth, handlers: explorerResizeHandlers } = useResizableWidth({
+    storageKey: FILE_EXPLORER_WIDTH_STORAGE_KEY,
+    defaultWidth: FILE_EXPLORER_DEFAULT_WIDTH,
+    minWidth: FILE_EXPLORER_MIN_WIDTH,
+    maxWidth: FILE_EXPLORER_MAX_WIDTH,
+    edge: "left",
+  });
   // Reading markdown rendered is a preference, not a property of one file. Keeping
   // it on the panel meant a thread switch dropped it and forced source back.
   const [renderMarkdownPreferred, setRenderMarkdownPreferred] = useLocalStorage(
@@ -1285,12 +1300,14 @@ export default function FilePreviewPanel({
         {showExplorer ? (
           <aside
             className={cn(
-              "flex min-h-0 shrink-0 bg-background",
-              previewPath
-                ? "w-[min(22rem,46%)] min-w-64 border-l border-border/60"
-                : "min-w-0 flex-1",
+              "relative flex min-h-0 shrink-0 bg-background",
+              previewPath ? "border-l border-border/60" : "min-w-0 flex-1",
             )}
+            style={resizableExplorer ? { width: `${explorerWidth}px` } : undefined}
           >
+            {resizableExplorer ? (
+              <RightPanelResizeHandle handlers={explorerResizeHandlers} />
+            ) : null}
             <FileBrowserPanel
               key={`${environmentId}:${cwd}`}
               environmentId={environmentId}

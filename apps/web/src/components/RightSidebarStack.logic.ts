@@ -25,8 +25,31 @@ export function terminalDockFillsColumn(input: { rightPanelOpen: boolean }): boo
 }
 
 /**
+ * Ceiling for the docked terminal when it shares the sidebar column with the
+ * surface panel. Callers that need "how tall can the dock be" should use this
+ * instead of clamping Infinity through {@link clampDockedTerminalHeight}.
+ */
+export function maxDockedTerminalHeight(
+  columnHeight: number,
+  options?: {
+    minTerminalHeight?: number;
+    minTopPaneHeight?: number;
+  },
+): number {
+  const minTerminal = options?.minTerminalHeight ?? RIGHT_SIDEBAR_MIN_TERMINAL_HEIGHT;
+  const minTopPane = options?.minTopPaneHeight ?? RIGHT_SIDEBAR_MIN_TOP_PANE_HEIGHT;
+  if (!(columnHeight > 0)) {
+    return minTerminal;
+  }
+  return Math.max(minTerminal, Math.floor(columnHeight) - minTopPane);
+}
+
+/**
  * Clamp a docked terminal height so the top pane keeps a usable minimum when
  * both the panel and terminal share the sidebar column.
+ *
+ * `height` must be a finite pixel value (persisted or live drag). Do not pass
+ * Infinity to derive the ceiling — use {@link maxDockedTerminalHeight}.
  */
 export function clampDockedTerminalHeight(
   height: number,
@@ -37,11 +60,10 @@ export function clampDockedTerminalHeight(
   },
 ): number {
   const minTerminal = options?.minTerminalHeight ?? RIGHT_SIDEBAR_MIN_TERMINAL_HEIGHT;
-  const minTopPane = options?.minTopPaneHeight ?? RIGHT_SIDEBAR_MIN_TOP_PANE_HEIGHT;
   const safeHeight = Number.isFinite(height) ? Math.round(height) : minTerminal;
   if (!(columnHeight > 0)) {
     return Math.max(minTerminal, safeHeight);
   }
-  const maxForTerminal = Math.max(minTerminal, Math.floor(columnHeight) - minTopPane);
+  const maxForTerminal = maxDockedTerminalHeight(columnHeight, options);
   return Math.min(Math.max(safeHeight, minTerminal), maxForTerminal);
 }

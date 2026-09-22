@@ -1,3 +1,4 @@
+import type { KeybindingCommand } from "@t3tools/contracts";
 import { Outlet, createFileRoute, redirect, useParams } from "@tanstack/react-router";
 import { useAtomValue } from "@effect/atom-react";
 import { useEffect, useMemo } from "react";
@@ -20,12 +21,20 @@ import { isEditableFocused } from "../lib/editableFocus";
 import { isModelPickerOpen } from "../modelPickerVisibility";
 import { undoLatestThreadAction } from "../hooks/showThreadUndoNotice";
 import { resolveShortcutCommand } from "../keybindings";
+import { subscribeAppCommand } from "../components/primaryBar/appCommandBus";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
 import { isPreviewSupportedInRuntime } from "../previewStateStore";
 import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
 import { useThreadSelectionStore } from "../threadSelectionStore";
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
 import { primaryServerKeybindingsAtom } from "~/state/server";
+
+// A menu pick has no keyboard event to suppress, and never repeats.
+const MENU_COMMAND_EVENT = {
+  preventDefault: () => {},
+  stopPropagation: () => {},
+  repeat: false,
+};
 
 function ChatRouteGlobalShortcuts() {
   const clearSelection = useThreadSelectionStore((state) => state.clearSelection);
@@ -61,23 +70,18 @@ function ChatRouteGlobalShortcuts() {
       : false,
   );
   useEffect(() => {
-    const onWindowKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) return;
-      const command = resolveShortcutCommand(event, keybindings, {
-        context: {
-          terminalFocus: isTerminalFocused(),
-          terminalOpen,
-          previewFocus: isPreviewFocused(),
-          previewOpen,
-          editableFocus: isEditableFocused(event.target),
-          modelPickerOpen: isModelPickerOpen(),
-        },
-      });
-
-      if (isCommandPaletteOpen()) {
-        return;
-      }
-
+    // One definition of what each command does, shared by the keybinding below
+    // and by the menus, which arrive through the app command bus with no event
+    // to consume.
+    const runCommand = (
+      command: KeybindingCommand | null,
+      event: {
+        preventDefault: () => void;
+        stopPropagation: () => void;
+        repeat: boolean;
+        key?: string;
+      },
+    ) => {
       if (command === "thread.undo") {
         if (event.repeat || isModelPickerOpen()) return;
         if (undoLatestThreadAction()) {
@@ -168,9 +172,32 @@ function ChatRouteGlobalShortcuts() {
       }
     };
 
+    const onWindowKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      const command = resolveShortcutCommand(event, keybindings, {
+        context: {
+          terminalFocus: isTerminalFocused(),
+          terminalOpen,
+          previewFocus: isPreviewFocused(),
+          previewOpen,
+          editableFocus: isEditableFocused(event.target),
+          modelPickerOpen: isModelPickerOpen(),
+        },
+      });
+
+      if (isCommandPaletteOpen()) {
+        return;
+      }
+
+      runCommand(command, event);
+    };
     window.addEventListener("keydown", onWindowKeyDown);
+    const unsubscribeAppCommand = subscribeAppCommand((command) =>
+      runCommand(command, MENU_COMMAND_EVENT),
+    );
     return () => {
       window.removeEventListener("keydown", onWindowKeyDown);
+      unsubscribeAppCommand();
     };
   }, [
     activeDraftThread,

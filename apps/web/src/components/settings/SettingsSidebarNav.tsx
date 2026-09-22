@@ -38,7 +38,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "../ui/sidebar";
-import { SidebarUtilityMenu } from "../sidebar/SidebarChrome";
+import { SidebarUpdatePill } from "../sidebar/SidebarUpdatePill";
 import { scrollToSettingsTarget } from "./settingsLayout";
 import {
   searchSettings,
@@ -350,7 +350,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
         </Suspense>
         <div className="flex items-center gap-1">
           <div className="min-w-0 flex-1">
-            <SidebarUtilityMenu />
+            <SidebarUpdatePill />
           </div>
           <Suspense fallback={null}>
             <T3ConnectSidebarAvatar />

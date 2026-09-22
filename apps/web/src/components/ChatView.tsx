@@ -384,7 +384,6 @@ import { expandedImageKey, type ExpandedImagePreview } from "./chat/ExpandedImag
 import { NoActiveThreadState } from "./NoActiveThreadState";
 import { subscribeAppCommand } from "./primaryBar/appCommandBus";
 import { PrimaryBarSlot } from "./primaryBar/primaryBarSlots";
-import { WorkspacePageHeader } from "./WorkspacePageHeader";
 import {
   type EnvironmentOption,
   resolveEffectiveEnvMode,
@@ -9884,8 +9883,13 @@ export default function ChatView(props: ChatViewProps) {
         )}
         data-chat-column-maximized-away={rightPanelMaximized ? "true" : "false"}
       >
-        {/* Top bar */}
-        <WorkspacePageHeader data-chat-header>
+        {/* The thread's own header. These controls act on this thread, so they
+            live with it and narrow with the column, rather than in the
+            application bar above. */}
+        <div
+          className="flex h-[var(--workspace-topbar-height)] min-h-[var(--workspace-topbar-height)] shrink-0 items-center gap-3 border-b border-border bg-background px-3 sm:px-4"
+          data-chat-header
+        >
           <ChatHeader
             {...(!supportsPullRequests || activeProjectRepository === null
               ? {}
@@ -9914,7 +9918,7 @@ export default function ChatView(props: ChatViewProps) {
             onUpdateProjectScript={updateProjectScript}
             onDeleteProjectScript={deleteProjectScript}
           />
-        </WorkspacePageHeader>
+        </div>
 
         {/* Main content area with optional plan sidebar */}
         <div className="flex min-h-0 min-w-0 flex-1">

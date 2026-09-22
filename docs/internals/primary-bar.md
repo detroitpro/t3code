@@ -4,18 +4,29 @@ The bar across the top of the window ([`PrimaryBar.tsx`](../../apps/web/src/comp
 is the titlebar. It spans the whole window above the sidebar and the main pane,
 and it is the only chrome that hosts navigation, so a control has one home.
 
+## What belongs in it
+
+The bar is application chrome: it acts on the window, not on one thread. Menus,
+the sidebar toggle, the destinations and the panel toggles live there.
+
+Controls scoped to a thread — its breadcrumb, project scripts, open in editor,
+git actions — belong to the thread instead, in the header row at the top of the
+chat column in [`ChatView.tsx`](../../apps/web/src/components/ChatView.tsx).
+That row narrows with the column when the right panel opens, which is the point:
+those controls stay next to what they act on. Page chrome wider than the bar,
+such as the Usage and Pull Requests filters, likewise stays in a row inside the
+page.
+
 ## Routes fill it without being mounted in it
 
-A route's breadcrumbs and its own controls reach the bar through
+A page's identity and the controls it contributes reach the bar through
 [`primaryBarSlots.tsx`](../../apps/web/src/components/primaryBar/primaryBarSlots.tsx):
 the bar exposes a `context` and an `actions` region, and routes render into them
 with `PrimaryBarSlot`, which portals the DOM while leaving the content in the
 route's React tree. That keeps route state, providers and suspense boundaries
 where they are, and it is why `WorkspacePageHeader` is a slot rather than a
-header element.
-
-Page chrome that is wider than the bar — list filters, search, refresh — belongs
-in a row inside the page instead. Usage and Pull Requests do that.
+header element. Settings puts its breadcrumb there; the thread view uses only
+the `actions` region, for the panel toggles.
 
 ## Geometry has to agree with Electron
 

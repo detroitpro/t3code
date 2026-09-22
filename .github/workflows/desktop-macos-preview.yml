@@ -14,17 +14,16 @@ name: Desktop macOS Preview
 # Closing the PR is handled by the publish workflow too, since deleting the
 # download needs a write token.
 
+# Fork: disabled. Signed macOS preview is out of scope (issue #21).
 on:
-  pull_request:
-    types: [labeled]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: desktop-macos-preview-${{ github.event.pull_request.number }}
-  # Adding an unrelated label skips the job and must not cancel a build.
-  cancel-in-progress: ${{ github.event.label.name == 'preview:mac' }}
+  group: desktop-macos-preview-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: false
 
 jobs:
   build:

@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Feature request
-    url: https://github.com/pingdotgg/t3code/discussions/categories/ideas
-    about: Suggest an improvement or new capability in Discussions.
+    url: https://github.com/detroitpro/t3code/issues/new
+    about: Suggest an improvement or new capability as a fork issue.

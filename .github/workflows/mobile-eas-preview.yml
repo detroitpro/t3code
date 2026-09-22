@@ -1,8 +1,8 @@
 name: Mobile EAS Preview
 
+# Fork: disabled. Mobile EAS preview is out of scope (issue #21).
 on:
-  pull_request:
-    types: [opened, reopened, synchronize, labeled]
+  workflow_dispatch:
 
 jobs:
   preview:

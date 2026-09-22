@@ -15,6 +15,10 @@ import { runAppCommand } from "./appCommandBus";
 import { runDesktopAppCommand } from "./desktopAppCommands";
 import { resolveMenus, type MenuAction, type ResolvedMenu } from "./menuModel";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
+import {
+  isSettingsNavigationTarget,
+  openSettingsFromTarget,
+} from "../settings/settingsPresentationStore";
 
 function useMenus(): ReadonlyArray<ResolvedMenu> {
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
@@ -47,6 +51,12 @@ function useRunMenuAction(): (action: MenuAction) => void {
           runAppCommand(action.command);
           return;
         case "navigate":
+          if (isSettingsNavigationTarget(action.to)) {
+            openSettingsFromTarget(action.to, {
+              openedAtPathname: window.location.pathname,
+            });
+            return;
+          }
           void navigate(
             action.to === "/pull-requests"
               ? { to: action.to, search: readPullRequestListPreferences() }

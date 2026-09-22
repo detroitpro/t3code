@@ -171,6 +171,7 @@ import { openLinkPullRequestDialog } from "./pullRequest/LinkPullRequestDialog";
 import { ProjectContentSearchDialog } from "./search/ProjectContentSearchDialog";
 import { toggleThemeEditorForTheme } from "./settings/themeEditorStore";
 import { searchSettings, SETTINGS_SECTION_LABELS } from "./settings/settingsSearch";
+import { openSettings, openSettingsFromTarget } from "./settings/settingsPresentationStore";
 import {
   COMMAND_PALETTE_META_ICON_CLASS,
   CommandPaletteMetaDot,
@@ -1510,8 +1511,10 @@ function OpenCommandPaletteDialog(props: {
 
   const openSourceControlSettings = useCallback(() => {
     setOpen(false);
-    void navigate({ to: "/settings/source-control" });
-  }, [navigate, setOpen]);
+    openSettingsFromTarget("/settings/source-control", {
+      openedAtPathname: window.location.pathname,
+    });
+  }, [setOpen]);
 
   const buildAddProjectSourceGroups = useCallback(
     (
@@ -1679,7 +1682,9 @@ function OpenCommandPaletteDialog(props: {
     // useful next step is connecting one.
     if (addProjectEnvironmentOptions.length === 0) {
       setOpen(false);
-      void navigate({ to: "/settings/connections" });
+      openSettingsFromTarget("/settings/connections", {
+        openedAtPathname: window.location.pathname,
+      });
       return;
     }
 
@@ -2062,7 +2067,7 @@ function OpenCommandPaletteDialog(props: {
     title: "Open settings",
     icon: <SettingsIcon className={ITEM_ICON_CLASS} />,
     run: async () => {
-      await navigate({ to: "/settings" });
+      openSettings({ openedAtPathname: window.location.pathname });
     },
   });
 
@@ -2117,11 +2122,9 @@ function OpenCommandPaletteDialog(props: {
     ...(item.secondary ? { secondary: true } : {}),
     icon: <SettingsIcon className={ITEM_ICON_CLASS} />,
     run: async () => {
-      await navigate({
-        to: item.to,
+      openSettingsFromTarget(item.to, {
         hash: item.targetId ?? item.id,
-        replace: pathname === item.to,
-        hashScrollIntoView: false,
+        openedAtPathname: window.location.pathname,
       });
     },
   }));

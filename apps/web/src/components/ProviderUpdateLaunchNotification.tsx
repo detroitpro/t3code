@@ -15,6 +15,7 @@ import {
 } from "./ProviderUpdateLaunchNotification.logic";
 import { ProviderUpdatePrimaryNotification } from "./ProviderUpdatePrimaryNotification";
 import { stackedThreadToast, toastManager } from "./ui/toast";
+import { openSettingsFromTarget } from "./settings/settingsPresentationStore";
 
 /**
  * True when a desktop-local secondary backend (the parallel WSL backend) is
@@ -113,7 +114,7 @@ function ProviderUpdateEnvironmentsNotification() {
       toastManager.close(active.toastId);
       activeToastRef.current = null;
     }
-    void navigate({ to: "/settings/providers" });
+    openSettingsFromTarget("/settings/providers", { openedAtPathname: window.location.pathname });
   }, [navigate]);
 
   useEffect(() => {

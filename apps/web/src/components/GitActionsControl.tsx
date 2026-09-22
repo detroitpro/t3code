@@ -115,6 +115,7 @@ import { type DraftId, useComposerDraftStore } from "~/composerDraftStore";
 import { getSourceControlPresentation } from "~/sourceControlPresentation";
 import { useOpenLink } from "~/browser/useOpenLink";
 import { useOpenPrLink } from "~/lib/openPullRequestLink";
+import { openSettingsFromTarget } from "./settings/settingsPresentationStore";
 
 interface GitActionsControlProps {
   presentation?: "toolbar" | "menu";
@@ -591,7 +592,9 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
 
   const openSourceControlSettings = useCallback(() => {
     handleOpenChange(false);
-    void navigate({ to: "/settings/source-control" });
+    openSettingsFromTarget("/settings/source-control", {
+      openedAtPathname: window.location.pathname,
+    });
   }, [handleOpenChange, navigate]);
 
   return (

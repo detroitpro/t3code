@@ -22,6 +22,7 @@ import {
 } from "./ProviderUpdateLaunchNotification.logic";
 import { hiddenToastActionProps, stackedThreadToast, toastManager } from "./ui/toast";
 import { useAtomCommand } from "../state/use-atom-command";
+import { openSettingsFromTarget } from "./settings/settingsPresentationStore";
 
 const seenProviderUpdateNotificationKeys = new Set<string>();
 type ProviderUpdateToastId = ReturnType<typeof toastManager.add>;
@@ -150,7 +151,7 @@ export function ProviderUpdatePrimaryNotification() {
       ) {
         activeToastRef.current = null;
       }
-      void navigate({ to: "/settings/providers" });
+      openSettingsFromTarget("/settings/providers", { openedAtPathname: window.location.pathname });
     },
     [navigate],
   );

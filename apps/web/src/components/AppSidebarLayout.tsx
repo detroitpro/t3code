@@ -6,11 +6,11 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { useLocation, useNavigate } from "@tanstack/react-router";
+import { useLocation } from "@tanstack/react-router";
 
 import { isElectron } from "../env";
 import { getLocalStorageItem, removeLocalStorageItem } from "../hooks/useLocalStorage";
-import { isMacPlatform } from "../lib/utils";
+import { cn, isMacPlatform } from "../lib/utils";
 import { useLegacySidebarEnabled } from "../hooks/useSettings";
 import {
   PanelAnimationSuppressionProvider,
@@ -21,7 +21,14 @@ import LegacyThreadSidebar from "./LegacySidebar";
 import ThreadSidebar from "./Sidebar";
 import { PrimaryBar } from "./primaryBar/PrimaryBar";
 import { PrimaryBarSlotProvider } from "./primaryBar/primaryBarSlots";
-import { SettingsSidebarNav } from "./settings/SettingsSidebarNav";
+import { SettingsEditorPlane } from "./settings/SettingsEditorPlane";
+import {
+  closeSettings,
+  openSettings,
+  useSettingsPresentationStore,
+  workspaceHrefFromLocation,
+  writeLastWorkspaceHref,
+} from "./settings/settingsPresentationStore";
 import { useProjects } from "../state/entities";
 import {
   resolveInitialThreadSidebarWidth,
@@ -55,7 +62,7 @@ function readInitialThreadSidebarWidth(): number {
   }
 }
 
-// Settings swaps the thread sidebar out of the tree. Keep the lightweight
+// Settings used to swap the thread sidebar out of the tree. Keep the lightweight
 // project projection subscribed so returning to a draft never renders the
 // zero-project state while the environment snapshot reconnects.
 function ProjectProjectionRetention() {
@@ -64,16 +71,16 @@ function ProjectProjectionRetention() {
 }
 
 export function AppSidebarLayout({ children }: { children: ReactNode }) {
-  const navigate = useNavigate();
   const legacySidebarEnabled = useLegacySidebarEnabled();
   const { active: panelAnimationsActive, durationMs: panelAnimationDurationMs } =
     usePanelAnimationSettings();
-  // Settings routes show the settings nav in place of whichever thread
-  // sidebar is active.
   const pathname = useLocation({ select: (location) => location.pathname });
+  const searchStr = useLocation({ select: (location) => location.searchStr });
+  const hash = useLocation({ select: (location) => location.hash });
   const panelAnimationsSuppressed = usePanelNavigationSuppression(pathname);
   const routePanelAnimationsActive = panelAnimationsActive && !panelAnimationsSuppressed;
-  const isOnSettings = pathname === "/settings" || pathname.startsWith("/settings/");
+  const settingsOpen = useSettingsPresentationStore((state) => state.open);
+  const openedAtPathname = useSettingsPresentationStore((state) => state.openedAtPathname);
   const isMacosDesktop = isElectron && isMacPlatform(navigator.platform);
   const [sidebarWidth, setSidebarWidth] = useState(readInitialThreadSidebarWidth);
   // Subscribed rather than read once: the clamp must track live window size,
@@ -121,6 +128,20 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   }, [isMacosDesktop]);
 
   useEffect(() => {
+    if (pathname.startsWith("/settings")) return;
+    writeLastWorkspaceHref(workspaceHrefFromLocation({ pathname, searchStr, hash }));
+  }, [hash, pathname, searchStr]);
+
+  // Selecting another thread (or leaving the page settings opened on) closes
+  // the plane so the user lands on the destination, not a stale overlay.
+  useEffect(() => {
+    if (!settingsOpen || openedAtPathname === null) return;
+    if (pathname !== openedAtPathname) {
+      closeSettings();
+    }
+  }, [openedAtPathname, pathname, settingsOpen]);
+
+  useEffect(() => {
     const onMenuAction = window.desktopBridge?.onMenuAction;
     if (typeof onMenuAction !== "function") {
       return;
@@ -128,17 +149,14 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
 
     const unsubscribe = onMenuAction((action) => {
       if (action === "open-settings") {
-        const isSettingsRoute = /^\/settings(\/|$)/.test(pathname);
-        if (!isSettingsRoute) {
-          void navigate({ to: "/settings" });
-        }
+        openSettings({ openedAtPathname: window.location.pathname });
       }
     });
 
     return () => {
       unsubscribe?.();
     };
-  }, [navigate, pathname]);
+  }, []);
 
   return (
     <PanelAnimationSuppressionProvider value={panelAnimationsSuppressed}>
@@ -167,16 +185,22 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
                 onResize: setSidebarWidth,
               }}
             >
-              {isOnSettings ? (
-                <SettingsSidebarNav pathname={pathname} />
-              ) : legacySidebarEnabled ? (
-                <LegacyThreadSidebar />
-              ) : (
-                <ThreadSidebar />
-              )}
+              {legacySidebarEnabled ? <LegacyThreadSidebar /> : <ThreadSidebar />}
               <SidebarRail onDoubleClick={resetSidebarWidth} />
             </Sidebar>
-            {children}
+            <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+              <div
+                className={cn(
+                  "flex min-h-0 min-w-0 flex-1 flex-col",
+                  settingsOpen &&
+                    "pointer-events-none invisible absolute inset-0 h-0 overflow-hidden",
+                )}
+                aria-hidden={settingsOpen}
+              >
+                {children}
+              </div>
+              {settingsOpen ? <SettingsEditorPlane /> : null}
+            </div>
           </div>
         </PrimaryBarSlotProvider>
       </SidebarProvider>

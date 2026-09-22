@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { useEnvironments } from "../../state/environments";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
+import { openSettings } from "../settings/settingsPresentationStore";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
@@ -51,8 +52,8 @@ export function PrimaryBarDestinations() {
     void navigate({ to: "/pull-requests", search: readPullRequestListPreferences() });
   }, [navigate]);
   const handleSettingsClick = useCallback(() => {
-    void navigate({ to: "/settings" });
-  }, [navigate]);
+    openSettings({ openedAtPathname: window.location.pathname });
+  }, []);
   const handleUsageClick = useCallback(() => {
     void navigate({ to: "/usage" });
   }, [navigate]);

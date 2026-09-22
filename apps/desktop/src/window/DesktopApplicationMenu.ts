@@ -82,7 +82,13 @@ const checkForUpdatesFromMenu = Effect.gen(function* () {
   }
 }).pipe(Effect.withSpan("desktop.menu.checkForUpdates"));
 
-const handleCheckForUpdatesMenuClick = Effect.gen(function* () {
+/**
+ * The manual "Check for Updates" flow, shared by the native Help menu item and
+ * the renderer-drawn menu bar's `check-for-updates` app command: it reports the
+ * disabled reason, the up-to-date state, and check failures in a dialog, so the
+ * user always gets an answer to a click they made.
+ */
+export const handleCheckForUpdatesRequest = Effect.gen(function* () {
   const updates = yield* DesktopUpdates.DesktopUpdates;
   const electronDialog = yield* ElectronDialog.ElectronDialog;
   const disabledReason = yield* updates.disabledReason;
@@ -103,7 +109,7 @@ const handleCheckForUpdatesMenuClick = Effect.gen(function* () {
   const desktopWindow = yield* DesktopWindow.DesktopWindow;
   yield* desktopWindow.ensureMain;
   yield* checkForUpdatesFromMenu;
-}).pipe(Effect.withSpan("desktop.menu.handleCheckForUpdatesClick"));
+}).pipe(Effect.withSpan("desktop.menu.handleCheckForUpdatesRequest"));
 
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = Effect.gen(function* () {
@@ -132,7 +138,7 @@ export const make = Effect.gen(function* () {
 
   const configure = Effect.gen(function* () {
     const checkForUpdatesClick = () => {
-      runMenuEffect("check-for-updates", handleCheckForUpdatesMenuClick);
+      runMenuEffect("check-for-updates", handleCheckForUpdatesRequest);
     };
     const settingsClick = () => {
       runMenuEffect("open-settings", dispatchMenuAction("open-settings"));

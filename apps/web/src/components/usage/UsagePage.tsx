@@ -21,7 +21,6 @@ import {
   type HourlyTotals,
 } from "@t3tools/shared/usageMerge";
 
-import { isElectron } from "../../env";
 import { cn } from "../../lib/utils";
 import { environmentPresentations } from "../../state/presentation";
 import { serverEnvironment } from "../../state/server";
@@ -59,7 +58,6 @@ import {
   WorkspaceBreadcrumbSeparator,
 } from "../WorkspaceBreadcrumb";
 import { WorkspacePageContainer } from "../WorkspacePageContainer";
-import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { UsageLimitsSection } from "./UsageLimits";
 import { UsagePriceOverrides } from "./UsagePriceOverrides";
 import { UsageProviderChart, type UsageChartMetric } from "./UsageProviderChart";
@@ -366,11 +364,11 @@ export function UsagePage() {
   );
 
   return (
-    <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none isolate">
+    <SidebarInset className="h-full min-h-0 overflow-hidden overscroll-y-none isolate">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background text-foreground">
-        <WorkspacePageHeader electron={isElectron} className="h-auto">
+        <div className="flex shrink-0 items-center border-b border-border px-3 sm:px-5">
           {topbarContent}
-        </WorkspacePageHeader>
+        </div>
 
         <ScrollArea className="min-h-0 flex-1">
           <WorkspacePageContainer width="wide">

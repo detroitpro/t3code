@@ -118,7 +118,7 @@ import {
   WorkspaceBreadcrumbSeparator,
 } from "../components/WorkspaceBreadcrumb";
 import { WorkspacePageContainer } from "../components/WorkspacePageContainer";
-import { WorkspacePageHeader } from "../components/WorkspacePageHeader";
+import { PrimaryBarSlot } from "../components/primaryBar/primaryBarSlots";
 import { isCommandPaletteOpen } from "../commandPaletteBus";
 import { isElectron } from "../env";
 import { resolveShortcutCommand, shortcutLabelForCommand } from "../keybindings";
@@ -1721,18 +1721,7 @@ function PullRequestsRouteView() {
       onToggleRightPanel={toggleRightPanel}
     />
   );
-  const openPanelControls = (
-    <div
-      // The bare workspace-titlebar-controls inset plus mr-px: the same
-      // anchor the thread view's controls and the sidebar trigger use, so
-      // every titlebar cluster in the app sits one shared inset from its
-      // edge.
-      className="absolute top-[var(--workspace-controls-top)] right-[var(--workspace-controls-right)] z-50 mr-px flex h-[var(--workspace-topbar-height)] items-center gap-1 [-webkit-app-region:no-drag]"
-      data-workspace-titlebar-controls
-    >
-      {panelToggleControls}
-    </div>
-  );
+  const openPanelControls = <PrimaryBarSlot name="actions">{panelToggleControls}</PrimaryBarSlot>;
   // The rows carried over from the last filters can also narrow to nothing one step further on,
   // where involvement is applied against the viewers of the answer they came from. "Nothing under
   // these filters" is a claim, and it is the wrong one to make about a question still in flight,
@@ -1945,42 +1934,6 @@ function PullRequestsRouteView() {
     searchInput,
     sortMenu,
     filtersMenu,
-    rightPanelControl:
-      // Footprint reserve while the panel is closed: the toggle itself stays
-      // mounted at the fixed titlebar inset in both states so it cannot move
-      // on toggle, and this spacer keeps refresh from sliding underneath it
-      // (sized per header padding so refresh ends a normal gap short of it).
-      !pullRequestsSupported ? null : (
-        <span
-          aria-hidden
-          className={cn(
-            "shrink-0",
-            rightPanelState.isOpen ? "-ml-3 w-0" : "w-7 sm:w-5",
-            panelAnimationsActive && "transition-[width,margin] ease-out",
-          )}
-          style={
-            panelAnimationsActive
-              ? { transitionDuration: `${panelAnimationDurationMs}ms` }
-              : undefined
-          }
-        />
-      ),
-    titlebarControls:
-      // While the panel is closed the strip lives inside the header: a no-drag
-      // descendant beats the header's desktop drag-region, where a floating
-      // sibling loses (app-region hit-testing ignores z-index). While the
-      // floating strip crosses the header during motion, the narrow extension
-      // keeps that overlap non-draggable without moving the toggle.
-      pullRequestsSupported ? (
-        rightPanelPresent ? (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-y-0 left-full w-7 [-webkit-app-region:no-drag]"
-          />
-        ) : (
-          openPanelControls
-        )
-      ) : null,
     rightPanelOpen: rightPanelState.isOpen,
     listBody,
     scrollRef,
@@ -2068,9 +2021,9 @@ function PullRequestsRouteView() {
   }, [keybindings]);
 
   return (
-    <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none">
+    <SidebarInset className="h-full min-h-0 overflow-hidden overscroll-y-none">
       <div className="relative flex min-h-0 flex-1">
-        {pullRequestsSupported && rightPanelPresent ? openPanelControls : null}
+        {pullRequestsSupported ? openPanelControls : null}
         <PullRequestsColumn {...columnProps} />
 
         {rightPanelPresent && renderedPullRequestSurface && panelEnvironmentId !== null ? (
@@ -2380,8 +2333,6 @@ function PullRequestsColumn({
   searchInput,
   sortMenu,
   filtersMenu,
-  rightPanelControl,
-  titlebarControls,
   rightPanelOpen,
   listBody,
   scrollRef,
@@ -2399,8 +2350,6 @@ function PullRequestsColumn({
   searchInput: ReactNode;
   sortMenu: ReactNode;
   filtersMenu: ReactNode;
-  rightPanelControl: ReactNode;
-  titlebarControls: ReactNode;
   rightPanelOpen: boolean;
   listBody: ReactNode;
   scrollRef: RefObject<HTMLDivElement | null>;
@@ -2464,19 +2413,7 @@ function PullRequestsColumn({
     // Painted flat like the chat column: the inset underneath carries the chrome grain, and a
     // content surface that lets it show reads as a different background than every thread.
     <div className="@container/pr-list flex min-h-0 min-w-0 flex-1 flex-col bg-background">
-      {/* A closed right panel leaves this column full-width, so the shared header
-          reserves native window controls and hosts the controls strip itself: on
-          desktop the header is a drag-region, and only a no-drag descendant wins
-          clicks from it - a floating sibling loses to app-region hit-testing no
-          matter its z-index. While the panel is open, the strip mounts back at
-          the route level, whose box spans the panel too, so the toggle keeps one
-          fixed top-right anchor. */}
-      <WorkspacePageHeader
-        electron={isElectron}
-        reserveNativeControls={!rightPanelOpen}
-        className="relative bg-background"
-      >
-        {titlebarControls}
+      <div className="relative flex shrink-0 items-center gap-3 border-b border-border bg-background px-3 py-2 sm:px-5">
         {condensed ? (
           <WorkspaceBreadcrumb ariaLabel="Pull request scope" className="overflow-hidden">
             {/* An expanded search owns the scarce horizontal space. The page title stays
@@ -2532,8 +2469,7 @@ function PullRequestsColumn({
             <PullRequestRefreshControl compact refreshing={refreshing} onRefresh={onRefresh} />
           </div>
         ) : null}
-        {rightPanelControl}
-      </WorkspacePageHeader>
+      </div>
 
       <div
         ref={scrollRef}

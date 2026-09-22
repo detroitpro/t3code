@@ -16,6 +16,7 @@ import type {
   ThreadId,
   TurnId,
 } from "@t3tools/contracts";
+import { isThinkingTraceMessage } from "@t3tools/contracts";
 import { renderAssistantCitationsAsText } from "@t3tools/shared/assistantCitations";
 import { encodeComposerContextFragment } from "@t3tools/shared/composerContextClipboard";
 import {
@@ -1481,7 +1482,7 @@ function renderFeedEntry(
 
   if (entry.type === "message") {
     const { message } = entry;
-    if (message.role === "reasoning") {
+    if (isThinkingTraceMessage(message)) {
       const messages = entry.reasoningMessages ?? [message];
       return (
         <ThreadReasoningRow
@@ -2718,7 +2719,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       switch (entry.type) {
         case "message":
           // A collapsed reasoning row is the same chrome as a work toggle.
-          return entry.message.role === "reasoning" && !expandedReasoningMessageIds.has(entry.id)
+          return isThinkingTraceMessage(entry.message) && !expandedReasoningMessageIds.has(entry.id)
             ? WORK_GROUP_TOGGLE_HEIGHT
             : undefined;
         case "turn-fold":

@@ -2,6 +2,7 @@ import { derivePendingRequests } from "@t3tools/client-runtime/pending-requests"
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import {
+  isThinkingTraceMessage,
   ApprovalRequestId,
   EventId,
   MessageId,
@@ -2318,8 +2319,8 @@ describe("buildThreadFeed", () => {
   it("groups ordered reasoning blocks, keeps the live slot, and restores the group after unfolding", () => {
     const turnId = TurnId.make("reasoning-group");
     const messages: OrchestrationThread["messages"] = [1, 2, 3, 4].map((second) => ({
-      id: MessageId.make(`reasoning-${second}`),
-      role: "reasoning",
+      id: MessageId.make(`reasoning:${second}`),
+      role: "system",
       text: `**Step ${second}**\n\nCheck ${second}.`,
       turnId,
       streaming: second === 4,
@@ -2397,7 +2398,7 @@ describe("buildThreadFeed", () => {
     expect(toolRunning[0]).not.toMatchObject({ summary: "Thinking" });
     const nextThought = {
       ...messages[3]!,
-      id: MessageId.make("reasoning-after-tool"),
+      id: MessageId.make("reasoning:after-tool"),
       createdAt: "2026-04-01T00:00:06.000Z",
       updatedAt: "2026-04-01T00:00:06.000Z",
     };
@@ -2517,8 +2518,8 @@ describe("buildThreadFeed", () => {
     (boundary) => {
       const turnId = TurnId.make("reasoning-boundary");
       const messages: OrchestrationThread["messages"] = [1, 3].map((second) => ({
-        id: MessageId.make(`reasoning-${second}`),
-        role: "reasoning",
+        id: MessageId.make(`reasoning:${second}`),
+        role: "system",
         text: `Step ${second}`,
         turnId:
           boundary === "unknown-turn"
@@ -2573,7 +2574,7 @@ describe("buildThreadFeed", () => {
         new Set(messages.map((message) => `activity-run:${message.id}`)),
       );
       const reasoningRows = rows.filter(
-        (entry) => entry.type === "message" && entry.message.role === "reasoning",
+        (entry) => entry.type === "message" && isThinkingTraceMessage(entry.message),
       );
       if (boundary === "failed-tool") {
         // A failed call stays inside the run instead of splitting it.

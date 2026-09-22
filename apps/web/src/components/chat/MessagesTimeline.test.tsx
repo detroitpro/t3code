@@ -1714,7 +1714,13 @@ describe("MessagesTimeline", () => {
                 },
                 {
                   ...thought,
-                  message: { ...thought.message, role: "reasoning", turnId, streaming },
+                  message: {
+                    ...thought.message,
+                    id: `reasoning:${thought.message.id}` as never,
+                    role: "system",
+                    turnId,
+                    streaming,
+                  },
                 },
               ]}
             />,

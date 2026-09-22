@@ -106,7 +106,7 @@ describe("mobile SQLite environment cache store", () => {
             messages: [
               {
                 id: MessageId.make("thinking-1"),
-                role: "reasoning",
+                role: "system",
                 text: "Checking the evidence.",
                 turnId: null,
                 streaming: false,

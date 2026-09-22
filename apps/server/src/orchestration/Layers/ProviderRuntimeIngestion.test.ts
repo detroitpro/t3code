@@ -5,6 +5,7 @@ import * as NodePath from "node:path";
 import * as NodeChildProcess from "node:child_process";
 
 import {
+  isThinkingTraceMessage,
   OrchestrationReadModel,
   ProviderDriverKind,
   ProviderRuntimeEvent,
@@ -1469,13 +1470,13 @@ describe("ProviderRuntimeIngestion", () => {
     const thread = await waitForThread(harness.readModel, (entry) =>
       entry.messages.some(
         (message: ProviderRuntimeTestMessage) =>
-          message.role === "reasoning" &&
+          isThinkingTraceMessage(message) &&
           !message.streaming &&
           message.text === "Weighing the options",
       ),
     );
-    const message = thread.messages.find(
-      (entry: ProviderRuntimeTestMessage) => entry.role === "reasoning",
+    const message = thread.messages.find((entry: ProviderRuntimeTestMessage) =>
+      isThinkingTraceMessage(entry),
     );
     expect(message?.text).toBe("Weighing the options");
     expect(message?.streaming).toBe(false);
@@ -1515,13 +1516,13 @@ describe("ProviderRuntimeIngestion", () => {
     const thread = await waitForThread(harness.readModel, (entry) =>
       entry.messages.some(
         (message: ProviderRuntimeTestMessage) =>
-          message.role === "reasoning" &&
+          isThinkingTraceMessage(message) &&
           !message.streaming &&
           message.text === "**First**\n\n**Second**",
       ),
     );
-    const message = thread.messages.find(
-      (entry: ProviderRuntimeTestMessage) => entry.role === "reasoning",
+    const message = thread.messages.find((entry: ProviderRuntimeTestMessage) =>
+      isThinkingTraceMessage(entry),
     );
     expect(message?.text).toBe("**First**\n\n**Second**");
   });
@@ -1548,13 +1549,13 @@ describe("ProviderRuntimeIngestion", () => {
     const thread = await waitForThread(harness.readModel, (entry) =>
       entry.messages.some(
         (message: ProviderRuntimeTestMessage) =>
-          message.role === "reasoning" &&
+          isThinkingTraceMessage(message) &&
           !message.streaming &&
           message.text === "reasoning reported in one piece",
       ),
     );
-    const message = thread.messages.find(
-      (entry: ProviderRuntimeTestMessage) => entry.role === "reasoning",
+    const message = thread.messages.find((entry: ProviderRuntimeTestMessage) =>
+      isThinkingTraceMessage(entry),
     );
     expect(message?.text).toBe("reasoning reported in one piece");
 
@@ -1590,8 +1591,9 @@ describe("ProviderRuntimeIngestion", () => {
     const after = await harness.readModel();
     const repeated = after.threads.find((entry) => entry.id === ThreadId.make("thread-1"));
     expect(
-      repeated?.messages.filter((entry: ProviderRuntimeTestMessage) => entry.role === "reasoning")
-        .length,
+      repeated?.messages.filter((entry: ProviderRuntimeTestMessage) =>
+        isThinkingTraceMessage(entry),
+      ).length,
     ).toBe(1);
   });
 
@@ -1632,11 +1634,11 @@ describe("ProviderRuntimeIngestion", () => {
       (entry) =>
         entry.messages.filter(
           (message: ProviderRuntimeTestMessage) =>
-            message.role === "reasoning" && !message.streaming,
+            isThinkingTraceMessage(message) && !message.streaming,
         ).length === 3,
     );
-    const reasoning = thread.messages.filter(
-      (entry: ProviderRuntimeTestMessage) => entry.role === "reasoning",
+    const reasoning = thread.messages.filter((entry: ProviderRuntimeTestMessage) =>
+      isThinkingTraceMessage(entry),
     );
     expect(reasoning.map((entry) => entry.text)).toEqual(["summary one", "raw one", "summary two"]);
     expect(new Set(reasoning.map((entry) => entry.id)).size).toBe(3);
@@ -1689,15 +1691,15 @@ describe("ProviderRuntimeIngestion", () => {
         (entry) =>
           entry.messages.some(
             (message: ProviderRuntimeTestMessage) =>
-              message.role === "reasoning" && !message.streaming,
+              isThinkingTraceMessage(message) && !message.streaming,
           ) &&
           entry.messages.some(
             (message: ProviderRuntimeTestMessage) =>
               message.role === "assistant" && !message.streaming,
           ),
       );
-      const reasoning = thread.messages.find(
-        (entry: ProviderRuntimeTestMessage) => entry.role === "reasoning",
+      const reasoning = thread.messages.find((entry: ProviderRuntimeTestMessage) =>
+        isThinkingTraceMessage(entry),
       );
       expect(reasoning?.text).toBe("thinking it through");
       expect(reasoning?.streaming).toBe(false);
@@ -1755,11 +1757,11 @@ describe("ProviderRuntimeIngestion", () => {
       (entry) =>
         entry.messages.filter(
           (message: ProviderRuntimeTestMessage) =>
-            message.role === "reasoning" && !message.streaming,
+            isThinkingTraceMessage(message) && !message.streaming,
         ).length === 2,
     );
-    const reasoning = thread.messages.filter(
-      (entry: ProviderRuntimeTestMessage) => entry.role === "reasoning",
+    const reasoning = thread.messages.filter((entry: ProviderRuntimeTestMessage) =>
+      isThinkingTraceMessage(entry),
     );
     expect(reasoning.map((entry) => entry.text)).toEqual(["before the tool", "after the tool"]);
     expect(reasoning[0]?.streaming).toBe(false);

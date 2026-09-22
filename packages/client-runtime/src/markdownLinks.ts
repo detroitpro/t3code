@@ -324,18 +324,71 @@ export function fileBasename(path: string): string {
   return separatorIndex >= 0 ? trimmed.slice(separatorIndex + 1) : trimmed;
 }
 
+function normalizeWorkspacePathForCompare(path: string): {
+  normalized: string;
+  comparable: string;
+  caseInsensitive: boolean;
+} {
+  const normalized = stripSlashPrefixedWindowsDrive(path.replaceAll("\\", "/")).replace(/\/+$/, "");
+  const caseInsensitive = isWindowsAbsolutePath(stripSlashPrefixedWindowsDrive(path));
+  return {
+    normalized,
+    comparable: caseInsensitive ? normalized.toLowerCase() : normalized,
+    caseInsensitive,
+  };
+}
+
 export function workspaceRelativeFilePath(
   path: string,
   workspaceRoot: string | null | undefined,
 ): string | null {
   if (!workspaceRoot) return null;
   const normalizedPath = stripSlashPrefixedWindowsDrive(path.replaceAll("\\", "/"));
-  const normalizedRoot = stripSlashPrefixedWindowsDrive(
-    workspaceRoot.replaceAll("\\", "/"),
-  ).replace(/\/+$/, "");
-  const caseInsensitive = isWindowsAbsolutePath(stripSlashPrefixedWindowsDrive(workspaceRoot));
-  const pathForCompare = caseInsensitive ? normalizedPath.toLowerCase() : normalizedPath;
-  const rootForCompare = caseInsensitive ? normalizedRoot.toLowerCase() : normalizedRoot;
-  if (!pathForCompare.startsWith(`${rootForCompare}/`)) return null;
-  return normalizedPath.slice(normalizedRoot.length + 1);
+  const rootCompare = normalizeWorkspacePathForCompare(workspaceRoot);
+  const pathForCompare = rootCompare.caseInsensitive
+    ? normalizedPath.toLowerCase()
+    : normalizedPath;
+  if (!pathForCompare.startsWith(`${rootCompare.comparable}/`)) return null;
+  return normalizedPath.slice(rootCompare.normalized.length + 1);
+}
+
+/**
+ * Like `workspaceRelativeFilePath`, but returns `""` when `path` is the workspace
+ * root itself so callers can open the explorer at the project root.
+ */
+export function workspaceRelativePathOrRoot(
+  path: string,
+  workspaceRoot: string | null | undefined,
+): string | null {
+  if (!workspaceRoot) return null;
+  const pathCompare = normalizeWorkspacePathForCompare(path);
+  const rootCompare = normalizeWorkspacePathForCompare(workspaceRoot);
+  if (pathCompare.comparable === rootCompare.comparable) return "";
+  return workspaceRelativeFilePath(path, workspaceRoot);
+}
+
+/**
+ * When a thread's active root is a git worktree, agents still emit paths under
+ * the main project checkout (`T3CODE_PROJECT_ROOT`, `~/…/project`, absolutes).
+ * Rewrite those onto `workspaceRoot` so Files reads the worktree copy.
+ */
+export function remapPathIntoWorkspaceRoot(input: {
+  path: string;
+  workspaceRoot: string;
+  sourceRoot: string;
+}): string {
+  const workspace = normalizeWorkspacePathForCompare(input.workspaceRoot);
+  const source = normalizeWorkspacePathForCompare(input.sourceRoot);
+  if (workspace.comparable === source.comparable) return input.path;
+
+  const relative = workspaceRelativePathOrRoot(input.path, input.sourceRoot);
+  if (relative === null) return input.path;
+  if (relative.length === 0) return workspace.normalized;
+
+  const separator = isWindowsAbsolutePath(stripSlashPrefixedWindowsDrive(input.workspaceRoot))
+    ? "\\"
+    : "/";
+  const relativeWithSeparator =
+    separator === "\\" ? relative.replaceAll("/", "\\") : relative.replaceAll("\\", "/");
+  return `${workspace.normalized}${separator}${relativeWithSeparator}`;
 }

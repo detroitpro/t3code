@@ -897,6 +897,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
             environmentId={props.environmentId}
             threadId={props.selectedThread.id}
             workspaceRoot={props.threadCwd}
+            projectWorkspaceRoot={props.projectWorkspaceRoot}
             feed={props.selectedThreadFeed}
             worktreeSetup={props.worktreeSetup}
             setupWorkingStartedAt={props.setupWorkingStartedAt}

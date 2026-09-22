@@ -148,6 +148,7 @@ import { remarkNormalizeListItemIndentation } from "../markdown-list-indentation
 import {
   extractMarkdownLinkHrefs,
   isWindowsDrivePathHref,
+  markdownFilePanelPath,
   normalizeMarkdownLinkDestination,
   resolveInlineCodeFileLinkMeta,
   resolveMarkdownFileLinkMeta,
@@ -185,7 +186,7 @@ import {
 import { useOpenLink } from "../browser/useOpenLink";
 import { writeTextToClipboard } from "../hooks/useCopyToClipboard";
 import { isPreviewSupportedInRuntime } from "../previewStateStore";
-import { isAbsolutePath, resolvePathLinkTarget } from "../terminal-links";
+import { resolvePathLinkTarget } from "../terminal-links";
 import {
   isBrowserPreviewFile,
   openFileInPreview,
@@ -199,6 +200,11 @@ import { PullRequestLinkPreview } from "./pullRequest/PullRequestLinkPreview";
 interface ChatMarkdownProps {
   text: string;
   cwd: string | undefined;
+  /**
+   * Main project checkout when `cwd` is a worktree. Absolute/`~/` links under
+   * this root remap into the worktree so Files reads the active checkout.
+   */
+  projectWorkspaceRoot?: string | undefined;
   threadRef?: ScopedThreadRef | undefined;
   /** Panel that receives pull request links, including the standalone PR view. */
   pullRequestPanelRef?: ScopedThreadRef | undefined;
@@ -1935,7 +1941,8 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
   }, [onOpen, targetPath]);
 
   const handleOpenInFilePreview = useCallback(() => {
-    if (threadRef && panelPath) {
+    // `""` is the workspace root directory — keep it as a valid panel path.
+    if (threadRef && panelPath !== null) {
       onOpenInPanel(panelPath, line);
       return;
     }
@@ -2145,7 +2152,7 @@ const MarkdownFileLink = memo(function MarkdownFileLink({
 
   const canOpenInEditor = onOpen !== undefined;
   const canOpenInBrowser = onOpenInBrowser !== undefined;
-  const canOpenInPanel = threadRef !== undefined && Boolean(panelPath);
+  const canOpenInPanel = threadRef !== undefined && panelPath !== null;
   const hasPrimaryAction = hasMarkdownFilePrimaryAction({
     canOpenInEditor,
     canOpenInBrowser,
@@ -2252,6 +2259,7 @@ function areMarkdownFileLinkPropsEqual(
 function useChatMarkdownState({
   text,
   cwd,
+  projectWorkspaceRoot,
   threadRef,
   pullRequestPanelRef,
   environmentId: explicitEnvironmentId,
@@ -2380,24 +2388,34 @@ function useChatMarkdownState({
       if (parseComposerContextHref(href)) continue;
       const normalizedHref = normalizeMarkdownLinkHrefKey(href);
       if (metaByHref.has(normalizedHref)) continue;
-      const meta = resolveMarkdownFileLinkMeta(normalizedHref, cwd, imageBaseDir ?? cwd);
+      const meta = resolveMarkdownFileLinkMeta(
+        normalizedHref,
+        cwd,
+        imageBaseDir ?? cwd,
+        projectWorkspaceRoot,
+      );
       if (meta) {
         metaByHref.set(normalizedHref, meta);
       }
     }
     return metaByHref;
-  }, [cwd, imageBaseDir, text]);
+  }, [cwd, imageBaseDir, projectWorkspaceRoot, text]);
   const inlineCodeFileLinkMetaByText = useMemo(() => {
     const metaByText = new Map<string, MarkdownFileLinkMeta>();
     for (const span of extractInlineCodeSpans(text)) {
       if (metaByText.has(span)) continue;
-      const meta = resolveInlineCodeFileLinkMeta(span, cwd, imageBaseDir ?? cwd);
+      const meta = resolveInlineCodeFileLinkMeta(
+        span,
+        cwd,
+        imageBaseDir ?? cwd,
+        projectWorkspaceRoot,
+      );
       if (meta) {
         metaByText.set(span, meta);
       }
     }
     return metaByText;
-  }, [cwd, imageBaseDir, text]);
+  }, [cwd, imageBaseDir, projectWorkspaceRoot, text]);
   const fileLinkParentSuffixByPath = useMemo(() => {
     const filePaths = [
       ...[...markdownFileLinkMetaByHref.values()].map((meta) => meta.filePath),
@@ -2598,9 +2616,8 @@ function useChatMarkdownState({
         ) !== null;
       // Media outside the workspace keeps the expanded preview; other host
       // files (a report in a temp dir) open read-only in the files panel.
-      const panelPath =
-        fileLinkMeta.workspaceRelativePath ??
-        (!canPreviewMedia && isAbsolutePath(fileLinkMeta.filePath) ? fileLinkMeta.filePath : null);
+      // `workspaceRelativePath` may be `""` for the workspace root directory.
+      const panelPath = markdownFilePanelPath(fileLinkMeta, { canPreviewMedia });
 
       return (
         <MarkdownFileLink
@@ -2657,6 +2674,7 @@ function useChatMarkdownState({
   const componentState = useMemo(
     () => ({
       cwd,
+      projectWorkspaceRoot,
       diffThemeName,
       environmentId,
       expandMedia,
@@ -2687,6 +2705,7 @@ function useChatMarkdownState({
     }),
     [
       cwd,
+      projectWorkspaceRoot,
       diffThemeName,
       environmentId,
       expandMedia,
@@ -2840,6 +2859,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
   a: function MarkdownAnchor({ node, href, children, title: _title, ...props }) {
     const {
       cwd,
+      projectWorkspaceRoot,
       environmentId,
       imageBaseDir,
       markdownFileLinkMetaByHref,
@@ -2871,7 +2891,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
     const normalizedHref = href ? normalizeMarkdownLinkHrefKey(href) : "";
     const fileLinkMeta = normalizedHref
       ? (markdownFileLinkMetaByHref.get(normalizedHref) ??
-        resolveMarkdownFileLinkMeta(normalizedHref, cwd, imageBaseDir ?? cwd))
+        resolveMarkdownFileLinkMeta(normalizedHref, cwd, imageBaseDir ?? cwd, projectWorkspaceRoot))
       : null;
     if (!fileLinkMeta) {
       const faviconHost = resolveExternalWebLinkHost(href);
@@ -3080,14 +3100,13 @@ const CHAT_MARKDOWN_COMPONENTS = {
     );
   },
   code: function MarkdownCode({ node, children, className, ...props }) {
-    const { cwd, imageBaseDir, inlineCodeFileLinkMetaByText, fileLinkChip } = use(
-      ChatMarkdownRendererContext,
-    );
+    const { cwd, imageBaseDir, projectWorkspaceRoot, inlineCodeFileLinkMetaByText, fileLinkChip } =
+      use(ChatMarkdownRendererContext);
     if (node?.properties?.dataInlineCode != null) {
       const codeText = nodeToPlainText(children);
       const fileLinkMeta =
         inlineCodeFileLinkMetaByText.get(codeText.trim()) ??
-        resolveInlineCodeFileLinkMeta(codeText, cwd, imageBaseDir ?? cwd);
+        resolveInlineCodeFileLinkMeta(codeText, cwd, imageBaseDir ?? cwd, projectWorkspaceRoot);
       if (fileLinkMeta) {
         return fileLinkChip(
           fileLinkMeta,

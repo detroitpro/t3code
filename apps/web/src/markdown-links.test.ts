@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import {
   extractMarkdownLinkHrefs,
   isWindowsDrivePathHref,
+  markdownFilePanelPath,
   resolveInlineCodeFileLinkMeta,
   resolveMarkdownFileLinkMeta,
   resolveMarkdownFileLinkTarget,
@@ -301,6 +302,42 @@ describe("resolveMarkdownFileLinkTarget", () => {
     ["/tmp/repo/file.ts%20", "/tmp/repo", "file.ts "],
   ])("preserves the preview target for %s in workspace %s", (href, cwd, workspaceRelativePath) => {
     expect(resolveMarkdownFileLinkMeta(href, cwd)).toMatchObject({ workspaceRelativePath });
+  });
+
+  it("remaps main-project paths into a worktree cwd for Files panel opens", () => {
+    const projectRoot = "/home/me/projects/active/t3code";
+    const worktreeRoot = "/home/me/.t3/worktrees/t3code/t3code-93b214f7";
+
+    expect(
+      resolveMarkdownFileLinkMeta(
+        `${projectRoot}/apps/web/src/foo.ts`,
+        worktreeRoot,
+        worktreeRoot,
+        projectRoot,
+      ),
+    ).toMatchObject({
+      filePath: `${worktreeRoot}/apps/web/src/foo.ts`,
+      workspaceRelativePath: "apps/web/src/foo.ts",
+    });
+
+    expect(
+      resolveInlineCodeFileLinkMeta(
+        "~/projects/active/t3code",
+        worktreeRoot,
+        worktreeRoot,
+        projectRoot,
+      ),
+    ).toMatchObject({
+      filePath: worktreeRoot,
+      workspaceRelativePath: "",
+    });
+
+    expect(
+      markdownFilePanelPath({
+        filePath: worktreeRoot,
+        workspaceRelativePath: "",
+      }),
+    ).toBe("");
   });
 
   it("keeps an encoded final space in the absolute target", () => {

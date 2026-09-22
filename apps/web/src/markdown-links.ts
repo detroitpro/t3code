@@ -6,13 +6,14 @@ import {
   normalizeMarkdownLinkDestination,
   parseFileUrlHref,
   parseMarkdownFileLink,
+  remapPathIntoWorkspaceRoot,
   safeDecodeURIComponent,
   splitFilePathPosition,
-  workspaceRelativeFilePath,
+  workspaceRelativePathOrRoot,
 } from "@t3tools/client-runtime/markdown-links";
 
 import { formatWorkspaceRelativePath } from "./filePathDisplay";
-import { isTerminalLinkActivation, resolvePathLinkTarget } from "./terminal-links";
+import { isAbsolutePath, isTerminalLinkActivation, resolvePathLinkTarget } from "./terminal-links";
 
 export { normalizeMarkdownLinkDestination };
 
@@ -89,31 +90,69 @@ export function resolveInlineCodeFileLinkMeta(
   codeText: string,
   cwd?: string,
   baseDir: string | undefined = cwd,
+  projectWorkspaceRoot?: string,
 ): MarkdownFileLinkMeta | null {
   const candidate = inlineCodeFilePathCandidate(codeText);
   if (candidate === null) return null;
 
-  return resolveMarkdownFileLinkMeta(candidate, cwd, baseDir);
+  return resolveMarkdownFileLinkMeta(candidate, cwd, baseDir, projectWorkspaceRoot);
 }
 
 export function resolveMarkdownFileLinkMeta(
   href: string | undefined,
   cwd?: string,
   baseDir: string | undefined = cwd,
+  projectWorkspaceRoot?: string,
 ): MarkdownFileLinkMeta | null {
   const targetPath = resolveMarkdownFileLinkTarget(href, cwd, baseDir);
   if (!targetPath) return null;
-  return buildFileLinkMetaFromTarget(targetPath, cwd);
+  return buildFileLinkMetaFromTarget(targetPath, cwd, projectWorkspaceRoot);
 }
 
-function buildFileLinkMetaFromTarget(targetPath: string, cwd?: string): MarkdownFileLinkMeta {
+/**
+ * Files panel path for a resolved link: workspace-relative (including `""` for
+ * the root directory), an absolute host path outside the workspace, or null.
+ */
+export function markdownFilePanelPath(
+  fileLinkMeta: Pick<MarkdownFileLinkMeta, "filePath" | "workspaceRelativePath">,
+  options?: { canPreviewMedia?: boolean },
+): string | null {
+  if (fileLinkMeta.workspaceRelativePath !== null) {
+    return fileLinkMeta.workspaceRelativePath;
+  }
+  if (options?.canPreviewMedia) return null;
+  return isAbsolutePath(fileLinkMeta.filePath) ? fileLinkMeta.filePath : null;
+}
+
+function buildFileLinkMetaFromTarget(
+  targetPath: string,
+  cwd?: string,
+  projectWorkspaceRoot?: string,
+): MarkdownFileLinkMeta {
   const { path, line, column } = splitFilePathPosition(targetPath);
+  const remappedPath =
+    cwd && projectWorkspaceRoot
+      ? remapPathIntoWorkspaceRoot({
+          path,
+          workspaceRoot: cwd,
+          sourceRoot: projectWorkspaceRoot,
+        })
+      : path;
+  const remappedTargetPath =
+    remappedPath === path
+      ? targetPath
+      : formatFilePathPosition({
+          path: remappedPath,
+          ...(line !== undefined ? { line } : {}),
+          ...(column !== undefined ? { column } : {}),
+        });
+
   return {
-    filePath: path,
-    targetPath,
-    displayPath: formatWorkspaceRelativePath(targetPath, cwd),
-    workspaceRelativePath: workspaceRelativeFilePath(path, cwd),
-    basename: fileBasename(path),
+    filePath: remappedPath,
+    targetPath: remappedTargetPath,
+    displayPath: formatWorkspaceRelativePath(remappedTargetPath, cwd),
+    workspaceRelativePath: workspaceRelativePathOrRoot(remappedPath, cwd),
+    basename: fileBasename(remappedPath),
     ...(line !== undefined ? { line } : {}),
     ...(column !== undefined ? { column } : {}),
   };

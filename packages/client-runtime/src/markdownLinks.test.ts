@@ -6,7 +6,9 @@ import {
   parseFileUrlHref,
   parseMarkdownFileLink,
   splitFilePathPosition,
+  remapPathIntoWorkspaceRoot,
   workspaceRelativeFilePath,
+  workspaceRelativePathOrRoot,
 } from "./markdownLinks.ts";
 
 describe("inlineCodeFilePathCandidate", () => {
@@ -166,5 +168,71 @@ describe("workspaceRelativeFilePath", () => {
     ["/repo/project/a.ts", undefined, null],
   ])("relates %s to %s", (path, workspaceRoot, relativePath) => {
     expect(workspaceRelativeFilePath(path, workspaceRoot)).toBe(relativePath);
+  });
+});
+
+describe("workspaceRelativePathOrRoot", () => {
+  it("returns an empty path for the workspace root itself", () => {
+    expect(workspaceRelativePathOrRoot("/repo/project", "/repo/project")).toBe("");
+    expect(workspaceRelativePathOrRoot("/repo/project/", "/repo/project")).toBe("");
+  });
+
+  it("still returns null outside the workspace", () => {
+    expect(workspaceRelativePathOrRoot("/tmp/report.ts", "/repo/project")).toBeNull();
+  });
+});
+
+describe("remapPathIntoWorkspaceRoot", () => {
+  const projectRoot = "/home/me/projects/active/t3code";
+  const worktreeRoot = "/home/me/.t3/worktrees/t3code/t3code-93b214f7";
+
+  it("rewrites main-project files onto the worktree root", () => {
+    expect(
+      remapPathIntoWorkspaceRoot({
+        path: `${projectRoot}/apps/web/src/foo.ts`,
+        workspaceRoot: worktreeRoot,
+        sourceRoot: projectRoot,
+      }),
+    ).toBe(`${worktreeRoot}/apps/web/src/foo.ts`);
+  });
+
+  it("rewrites the main project root onto the worktree root", () => {
+    expect(
+      remapPathIntoWorkspaceRoot({
+        path: projectRoot,
+        workspaceRoot: worktreeRoot,
+        sourceRoot: projectRoot,
+      }),
+    ).toBe(worktreeRoot);
+  });
+
+  it("leaves paths already inside the worktree alone", () => {
+    expect(
+      remapPathIntoWorkspaceRoot({
+        path: `${worktreeRoot}/apps/web/src/foo.ts`,
+        workspaceRoot: worktreeRoot,
+        sourceRoot: projectRoot,
+      }),
+    ).toBe(`${worktreeRoot}/apps/web/src/foo.ts`);
+  });
+
+  it("leaves unrelated host paths alone", () => {
+    expect(
+      remapPathIntoWorkspaceRoot({
+        path: "/tmp/report.md",
+        workspaceRoot: worktreeRoot,
+        sourceRoot: projectRoot,
+      }),
+    ).toBe("/tmp/report.md");
+  });
+
+  it("is a no-op when source and workspace roots match", () => {
+    expect(
+      remapPathIntoWorkspaceRoot({
+        path: `${projectRoot}/apps/web/src/foo.ts`,
+        workspaceRoot: projectRoot,
+        sourceRoot: projectRoot,
+      }),
+    ).toBe(`${projectRoot}/apps/web/src/foo.ts`);
   });
 });

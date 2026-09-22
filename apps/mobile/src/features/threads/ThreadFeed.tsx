@@ -185,12 +185,7 @@ import { usePreparedConnection } from "../../state/session";
 import { useThreadSelection } from "../../state/use-thread-selection";
 import { composerDocumentAttachmentRecord } from "../../lib/composerContext";
 import * as Option from "effect/Option";
-import {
-  basename,
-  fileRoutePathSegments,
-  isAbsolutePath,
-  resolveWorkspaceRelativeFilePath,
-} from "../files/filePath";
+import { basename, fileRoutePathSegments, isAbsolutePath } from "../files/filePath";
 import { fileChipMenu, resolveFileChipTarget, type FileChipAction } from "./fileChipMenu";
 import { useFileChipShare } from "./useFileChipShare";
 import {
@@ -253,6 +248,8 @@ export interface ThreadFeedProps {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
   readonly workspaceRoot?: string | null;
+  /** Main project checkout when `workspaceRoot` is a worktree. */
+  readonly projectWorkspaceRoot?: string | null;
   readonly feed: ReadonlyArray<ThreadFeedEntry>;
   readonly contentPresentation: ThreadContentPresentation;
   readonly agentLabel: string;
@@ -2078,13 +2075,11 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     (href: string) => {
       const presentation = resolveMarkdownLinkPresentation(href);
       if (presentation.kind === "file") {
-        const relativePath = resolveWorkspaceRelativeFilePath(
-          props.workspaceRoot,
-          presentation.path,
-        );
-        if (relativePath) {
+        const target = resolveFileChipTarget(href, props.workspaceRoot, props.projectWorkspaceRoot);
+        const relativePath = target?.relativePath;
+        if (relativePath !== undefined) {
           void Haptics.selectionAsync();
-          if (isPdfFile({ name: relativePath })) {
+          if (isPdfFile({ name: relativePath || "workspace" })) {
             setExpandedFile(
               (current) =>
                 current ?? {
@@ -2164,24 +2159,30 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
         void tryOpenExternalUrl(presentation.href, "markdown-link");
       }
     },
-    [props.environmentId, props.threadId, props.workspaceRoot, navigation],
+    [
+      props.environmentId,
+      props.threadId,
+      props.workspaceRoot,
+      props.projectWorkspaceRoot,
+      navigation,
+    ],
   );
   const markdownLinkHandlers = useMemo<MarkdownLinkHandlers>(
     () => ({
       onLinkPress: onMarkdownLinkPress,
       fileContextMenu: (href) => {
-        const target = resolveFileChipTarget(href, props.workspaceRoot);
+        const target = resolveFileChipTarget(href, props.workspaceRoot, props.projectWorkspaceRoot);
         return target ? fileChipMenu(target) : undefined;
       },
       onFileContextMenuAction: (href, actionId) => {
-        const target = resolveFileChipTarget(href, props.workspaceRoot);
+        const target = resolveFileChipTarget(href, props.workspaceRoot, props.projectWorkspaceRoot);
         if (!target) return;
         switch (actionId as FileChipAction) {
           case "copy-full-path":
             if (target.fullPath) copyTextWithHaptic(target.fullPath);
             return;
           case "copy-relative-path":
-            if (target.relativePath) copyTextWithHaptic(target.relativePath);
+            if (target.relativePath !== undefined) copyTextWithHaptic(target.relativePath);
             return;
           case "open-file":
             onMarkdownLinkPress(href);
@@ -2192,7 +2193,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
         }
       },
     }),
-    [onMarkdownLinkPress, props.workspaceRoot, shareFileChip],
+    [onMarkdownLinkPress, props.workspaceRoot, props.projectWorkspaceRoot, shareFileChip],
   );
   const renderMarkdownImage = useCallback<MarkdownImageRenderer>(
     (image) => {

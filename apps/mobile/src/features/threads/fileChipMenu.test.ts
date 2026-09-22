@@ -26,6 +26,21 @@ describe("resolveFileChipTarget", () => {
     expect(resolveFileChipTarget("~/report.md", "/repo")).toBeNull();
     expect(resolveFileChipTarget("../other/file.ts", "/repo")).toBeNull();
   });
+
+  it("remaps main-project absolute paths into a worktree workspace", () => {
+    const projectRoot = "/home/me/projects/active/t3code";
+    const worktreeRoot = "/home/me/.t3/worktrees/t3code/t3code-93b214f7";
+    expect(
+      resolveFileChipTarget(`${projectRoot}/apps/web/src/foo.ts`, worktreeRoot, projectRoot),
+    ).toEqual({
+      fullPath: `${worktreeRoot}/apps/web/src/foo.ts`,
+      relativePath: "apps/web/src/foo.ts",
+    });
+    expect(resolveFileChipTarget(projectRoot, worktreeRoot, projectRoot)).toEqual({
+      fullPath: worktreeRoot,
+      relativePath: "",
+    });
+  });
 });
 
 describe("fileChipMenu", () => {

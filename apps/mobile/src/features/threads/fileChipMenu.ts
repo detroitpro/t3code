@@ -1,4 +1,4 @@
-import { fileBasename } from "@t3tools/client-runtime/markdown-links";
+import { fileBasename, remapPathIntoWorkspaceRoot } from "@t3tools/client-runtime/markdown-links";
 import type { ThreadId } from "@t3tools/contracts";
 import { resolveMarkdownLinkPresentation } from "@t3tools/mobile-markdown-text/links";
 import type { MarkdownFileContextMenu } from "@t3tools/mobile-markdown-text/types";
@@ -23,19 +23,35 @@ export interface FileChipTarget {
 export function resolveFileChipTarget(
   href: string,
   workspaceRoot: string | null | undefined,
+  projectWorkspaceRoot?: string | null,
 ): FileChipTarget | null {
   const presentation = resolveMarkdownLinkPresentation(href);
   if (presentation.kind !== "file") return null;
-  const relativePath = resolveWorkspaceRelativeFilePath(workspaceRoot, presentation.path);
-  const fullPath = isAbsolutePath(presentation.path)
-    ? presentation.path
-    : workspaceRoot && relativePath
+
+  const remappedPath =
+    workspaceRoot && projectWorkspaceRoot
+      ? remapPathIntoWorkspaceRoot({
+          path: presentation.path,
+          workspaceRoot,
+          sourceRoot: projectWorkspaceRoot,
+        })
+      : presentation.path;
+
+  const relativeFromWorkspace = resolveWorkspaceRelativeFilePath(workspaceRoot, remappedPath);
+  const normalizedWorkspace = workspaceRoot?.replaceAll("\\", "/").replace(/\/+$/, "");
+  const normalizedRemapped = remappedPath.replaceAll("\\", "/").replace(/\/+$/, "");
+  const relativePath =
+    relativeFromWorkspace ??
+    (normalizedWorkspace !== undefined && normalizedRemapped === normalizedWorkspace ? "" : null);
+  const fullPath = isAbsolutePath(remappedPath)
+    ? remappedPath
+    : workspaceRoot && relativePath !== null
       ? resolveWorkspaceFilePath(workspaceRoot, relativePath)
       : undefined;
-  if (!fullPath && !relativePath) return null;
+  if (!fullPath && relativePath === null) return null;
   return {
     ...(fullPath ? { fullPath } : {}),
-    ...(relativePath ? { relativePath } : {}),
+    ...(relativePath !== null ? { relativePath } : {}),
   };
 }
 

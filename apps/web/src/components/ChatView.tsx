@@ -3743,9 +3743,17 @@ export default function ChatView(props: ChatViewProps) {
       threadKey: activeThreadKey,
       entries: timelineEntries,
       markdownCwd: gitCwd,
+      projectWorkspaceRoot: activeProjectCwd,
       workspaceRoot: activeWorkspaceRoot ?? null,
     });
-  }, [activeThreadKey, activeWorkspaceRoot, gitCwd, threadDetailLoading, timelineEntries]);
+  }, [
+    activeThreadKey,
+    activeProjectCwd,
+    activeWorkspaceRoot,
+    gitCwd,
+    threadDetailLoading,
+    timelineEntries,
+  ]);
   const heldPaintContext = paintOnlyDisplayedTimeline
     ? peekHeldThreadTimeline<typeof timelineEntries>()
     : null;
@@ -9951,6 +9959,11 @@ export default function ChatView(props: ChatViewProps) {
                   paintOnlyDisplayedTimeline
                     ? (heldPaintContext?.markdownCwd ?? undefined)
                     : (gitCwd ?? undefined)
+                }
+                projectWorkspaceRoot={
+                  paintOnlyDisplayedTimeline
+                    ? (heldPaintContext?.projectWorkspaceRoot ?? undefined)
+                    : (activeProjectCwd ?? undefined)
                 }
                 resolvedTheme={resolvedTheme}
                 timestampFormat={timestampFormat}

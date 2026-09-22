@@ -37,6 +37,28 @@ describe("terminalUiStateStore actions", () => {
     });
   });
 
+  it("seeds an open default terminal only when the thread has no stored state", () => {
+    const store = useTerminalUiStateStore.getState();
+    expect(store.seedTerminalOnNewThread(THREAD_REF)).toBe(true);
+
+    const seeded = selectThreadTerminalUiState(
+      useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+      THREAD_REF,
+    );
+    expect(seeded.terminalOpen).toBe(true);
+    expect(seeded.terminalIds).toEqual([DEFAULT_THREAD_TERMINAL_ID]);
+    expect(seeded.activeTerminalId).toBe(DEFAULT_THREAD_TERMINAL_ID);
+
+    useTerminalUiStateStore.getState().setTerminalOpen(THREAD_REF, false);
+    expect(useTerminalUiStateStore.getState().seedTerminalOnNewThread(THREAD_REF)).toBe(false);
+    expect(
+      selectThreadTerminalUiState(
+        useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+        THREAD_REF,
+      ).terminalOpen,
+    ).toBe(false);
+  });
+
   it("opens and splits terminals into the active group", () => {
     const store = useTerminalUiStateStore.getState();
     store.setTerminalOpen(THREAD_REF, true);

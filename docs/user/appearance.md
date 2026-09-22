@@ -25,7 +25,8 @@ of the selected theme.
 
 The main sidebar, right panel, and terminal drawer open and close immediately by default. On wide
 layouts the terminal docks under the right panel so it stays visible while you switch Files,
-browser, and other surfaces; on narrow layouts it still sits under the chat column. Move the
+browser, and other surfaces; on narrow layouts it still sits under the chat column. New threads
+open Files and the terminal together; hiding either only affects that thread. Move the
 **Panel animations** slider above 0 ms to add motion, up to 400 ms, unless reduced motion is enabled
 in your operating system. Moving between threads always snaps to the selected thread's panel state
 without replaying its transitions.

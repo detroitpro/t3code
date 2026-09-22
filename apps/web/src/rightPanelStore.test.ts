@@ -440,13 +440,14 @@ describe("rightPanelStore", () => {
     expect(store.getUserActionRevision(refA)).toBe(0);
   });
 
-  it("seedFilesOnNewThread no-ops when the preference is off", () => {
+  it("seedFilesOnNewThread still opens Files when the legacy preference is off", () => {
     useRightPanelStore.setState({ openFilesOnNewThread: false });
     useRightPanelStore.getState().seedFilesOnNewThread(refA);
+    expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refA)).toBe("files");
     expect(selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA)).toEqual({
-      isOpen: false,
-      activeSurfaceId: null,
-      surfaces: [],
+      isOpen: true,
+      activeSurfaceId: "files",
+      surfaces: [{ id: "files", kind: "files" }],
     });
   });
 
@@ -480,30 +481,15 @@ describe("rightPanelStore", () => {
     });
   });
 
-  it("closing the panel turns off openFilesOnNewThread", () => {
+  it("closing the panel keeps the legacy openFilesOnNewThread flag unchanged", () => {
     const store = useRightPanelStore.getState();
     store.open(refA, "files");
     expect(useRightPanelStore.getState().openFilesOnNewThread).toBe(true);
     store.close(refA);
-    expect(useRightPanelStore.getState().openFilesOnNewThread).toBe(false);
+    expect(useRightPanelStore.getState().openFilesOnNewThread).toBe(true);
     store.show(refA);
     store.toggleVisibility(refA);
-    expect(useRightPanelStore.getState().openFilesOnNewThread).toBe(false);
-  });
-
-  it("opening Files turns openFilesOnNewThread back on", () => {
-    useRightPanelStore.setState({ openFilesOnNewThread: false });
-    useRightPanelStore.getState().open(refA, "files");
     expect(useRightPanelStore.getState().openFilesOnNewThread).toBe(true);
-
-    useRightPanelStore.setState({
-      byThreadKey: {},
-      openFilesOnNewThread: false,
-      userActionRevisionByThreadKey: {},
-    });
-    useRightPanelStore.getState().toggle(refA, "files");
-    expect(useRightPanelStore.getState().openFilesOnNewThread).toBe(true);
-    expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refA)).toBe("files");
   });
 
   it("openProactive still respects user revision after seed", () => {

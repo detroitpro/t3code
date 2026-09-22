@@ -36,6 +36,7 @@ import {
   type OrchestrationLatestTurn,
   type TurnId,
   type WorktreeSetupSnapshot,
+  isThinkingTraceMessage,
 } from "@t3tools/contracts";
 import { formatWorkspaceRelativePath } from "../../filePathDisplay";
 
@@ -318,7 +319,7 @@ type ActivityEntry = Extract<TimelineEntry, { kind: "message" | "work" }>;
 
 function isActivityEntry(entry: TimelineEntry): entry is ActivityEntry {
   return entry.kind === "message"
-    ? entry.message.role === "reasoning"
+    ? isThinkingTraceMessage(entry.message)
     : entry.kind === "work" &&
         entry.entry.agentSpawn === undefined &&
         entry.entry.questionAnswer === undefined &&
@@ -570,7 +571,7 @@ function lastUserMessageIndex(timelineEntries: ReadonlyArray<TimelineEntry>): nu
 
 function timelineEntryTurnId(entry: TimelineEntry): TurnId | null {
   if (entry.kind === "message") {
-    return entry.message.role === "assistant" || entry.message.role === "reasoning"
+    return entry.message.role === "assistant" || isThinkingTraceMessage(entry.message)
       ? (entry.message.turnId ?? null)
       : null;
   }
@@ -656,7 +657,7 @@ function deriveTurnFolds(input: {
     // Nothing folds while the turn is live, which is when traces are watched.
     const turnId =
       entry.kind === "message" &&
-      (entry.message.role === "assistant" || entry.message.role === "reasoning")
+      (entry.message.role === "assistant" || isThinkingTraceMessage(entry.message))
         ? (entry.message.turnId ?? null)
         : entry.kind === "work"
           ? (entry.entry.turnId ?? null)
@@ -686,7 +687,7 @@ function deriveTurnFolds(input: {
       // A live turn is already excluded above, so only an answer still being
       // written may hold a fold open. A thinking block stranded by a crashed
       // provider keeps its streaming flag forever and must not.
-      if (entry.message.streaming && entry.message.role !== "reasoning") {
+      if (entry.message.streaming && !isThinkingTraceMessage(entry.message)) {
         group.hasStreamingMessage = true;
       }
     }
@@ -711,7 +712,7 @@ function deriveTurnFolds(input: {
     const trailingEntryCount = group.entries.filter(
       (candidate, candidateIndex) =>
         candidateIndex > terminalEntryIndex &&
-        !(candidate.kind === "message" && candidate.message.role === "reasoning"),
+        !(candidate.kind === "message" && isThinkingTraceMessage(candidate.message)),
     ).length;
     for (const [index, entry] of group.entries.entries()) {
       if (entry.id === group.terminalEntry?.id) {
@@ -725,7 +726,7 @@ function deriveTurnFolds(input: {
         !workEntryDisplayIndicatesToolFailure(entry.entry);
       // A thinking block after the answer folds with its turn rather than
       // trailing under it, which is what mobile already does.
-      const isReasoning = entry.kind === "message" && entry.message.role === "reasoning";
+      const isReasoning = entry.kind === "message" && isThinkingTraceMessage(entry.message);
       if (
         !isCompaction &&
         !isReasoning &&
@@ -754,7 +755,7 @@ function deriveTurnFolds(input: {
       (entry) =>
         hiddenEntryIds.has(entry.id) &&
         !(entry.kind === "work" && entry.entry.sourceActivityKind === "context-compaction") &&
-        !(entry.kind === "message" && entry.message.role === "reasoning"),
+        !(entry.kind === "message" && isThinkingTraceMessage(entry.message)),
     );
     if (!hidesFoldableWork) {
       continue;
@@ -837,7 +838,7 @@ function attachTrailingToolGroupsToAssistant(
       }
       // A thinking block can follow the answer (the next one starts before its
       // tool call); it is not another message in the conversation.
-      if (candidate.kind === "message" && candidate.message.role === "reasoning") {
+      if (candidate.kind === "message" && isThinkingTraceMessage(candidate.message)) {
         continue;
       }
       if (candidate.kind === "message") {

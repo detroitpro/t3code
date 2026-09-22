@@ -1912,8 +1912,8 @@ describe("deriveMessagesTimelineRows", () => {
     kind: "message" as const,
     createdAt: at,
     message: {
-      id: id as never,
-      role: "reasoning" as const,
+      id: (id.startsWith("reasoning:") ? id : `reasoning:${id}`) as never,
+      role: "system" as const,
       text: "weighing it up",
       turnId: turnId as never,
       createdAt: at,

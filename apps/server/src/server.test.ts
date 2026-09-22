@@ -8534,11 +8534,11 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
   );
 
   for (const reasoningMessages of [undefined, true] as const) {
-    it.effect(`preserves reasoning wire compatibility with opt-in ${reasoningMessages}`, () =>
+    it.effect(`projects thinking traces as system for opt-in ${reasoningMessages}`, () =>
       Effect.gen(function* () {
         const message = {
-          id: MessageId.make("thinking-compatibility"),
-          role: "reasoning" as const,
+          id: MessageId.make("reasoning:thinking-compatibility"),
+          role: "system" as const,
           text: "Checking the available evidence.",
           turnId: null,
           streaming: false,
@@ -8607,7 +8607,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
             },
           },
         });
-        const role = reasoningMessages ? "reasoning" : "system";
+        const role = "system";
         const response = yield* fetchEffect(
           yield* getHttpServerUrl(
             `/api/orchestration/threads/${defaultThreadId}?turnLimit=1${reasoningMessages ? "&reasoningMessages=true" : ""}`,
@@ -8645,8 +8645,8 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
           assert.deepEqual(events[1]?.event, answer);
           assert.deepEqual(items.at(-1), { kind: "synchronized" });
         }
-        assert.equal(message.role, "reasoning");
-        assert.equal(event.payload.role, "reasoning");
+        assert.equal(message.role, "system");
+        assert.equal(event.payload.role, "system");
       }).pipe(Effect.provide(NodeHttpServer.layerTest)),
     );
   }

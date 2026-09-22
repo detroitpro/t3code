@@ -560,16 +560,38 @@ export const OrchestrationProject = Schema.Struct({
 });
 export type OrchestrationProject = typeof OrchestrationProject.Type;
 
-/** `reasoning` carries a provider's thinking trace: a reasoning summary, or
- *  the raw chain of thought when the model exposes one. It is a sibling of the
- *  assistant text it precedes, not a replacement for it. */
-export const OrchestrationMessageRole = Schema.Literals([
-  "user",
-  "assistant",
-  "system",
-  "reasoning",
+/** `system` carries server notices and (via `reasoning:` message ids) provider
+ *  thinking traces. Thinking used to be a dedicated `reasoning` role; that
+ *  value is still accepted on decode so older event stores load, but new
+ *  writes must use `system` so clients that only allow user|assistant|system
+ *  can boot against a shared userdata directory. */
+const OrchestrationMessageRoleLiterals = Schema.Literals(["user", "assistant", "system"]);
+const OrchestrationMessageRoleSource = Schema.Union([
+  OrchestrationMessageRoleLiterals,
+  Schema.Literal("reasoning"),
 ]);
+
+export const OrchestrationMessageRole = OrchestrationMessageRoleSource.pipe(
+  Schema.decodeTo(
+    OrchestrationMessageRoleLiterals,
+    SchemaTransformation.transform({
+      decode: (role) => (role === "reasoning" ? ("system" as const) : role),
+      encode: (role) => role,
+    }),
+  ),
+);
 export type OrchestrationMessageRole = typeof OrchestrationMessageRole.Type;
+
+/** Message ids for provider thinking traces. Prefer this over a dedicated role
+ *  so the event store stays readable by older T3 builds. */
+export const REASONING_MESSAGE_ID_PREFIX = "reasoning:";
+
+export function isThinkingTraceMessage(message: {
+  readonly id: string;
+  readonly role?: string;
+}): boolean {
+  return message.id.startsWith(REASONING_MESSAGE_ID_PREFIX) || message.role === "reasoning";
+}
 
 export const OrchestrationMessage = Schema.Struct({
   id: MessageId,

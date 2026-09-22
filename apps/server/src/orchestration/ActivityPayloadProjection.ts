@@ -1,8 +1,9 @@
 import { projectQuestionToolInput } from "@t3tools/shared/toolActivity";
-import type {
-  OrchestrationEvent,
-  OrchestrationThreadActivity,
-  OrchestrationThreadDetailSnapshot,
+import {
+  isThinkingTraceMessage,
+  type OrchestrationEvent,
+  type OrchestrationThreadActivity,
+  type OrchestrationThreadDetailSnapshot,
 } from "@t3tools/contracts";
 import { isWorkspaceImagePreviewPath } from "@t3tools/shared/filePreview";
 import { extractJsonObject } from "@t3tools/shared/schemaJson";
@@ -654,7 +655,7 @@ export function projectThreadDetailSnapshot(
       messages: reasoningMessages
         ? snapshot.thread.messages
         : snapshot.thread.messages.map((message) =>
-            message.role === "reasoning" ? { ...message, role: "system" as const } : message,
+            isThinkingTraceMessage(message) ? { ...message, role: "system" as const } : message,
           ),
       activities: dropSupersededToolUpdatedActivities(
         dropStaleContextWindowActivities(snapshot.thread.activities),
@@ -668,11 +669,13 @@ export function projectActivityEvent(
   reasoningMessages = true,
 ): OrchestrationEvent {
   // Preserve sequence watermarks and message identities for clients whose role
-  // decoder predates reasoning. Filtering would strand their history pages.
+  // decoder predates thinking-trace message ids. Filtering would strand their
+  // history pages. New writes already use role "system"; this covers legacy
+  // `reasoning` roles still present in older event stores.
   if (
     !reasoningMessages &&
     event.type === "thread.message-sent" &&
-    event.payload.role === "reasoning"
+    isThinkingTraceMessage({ id: event.payload.messageId, role: event.payload.role })
   ) {
     return { ...event, payload: { ...event.payload, role: "system" } };
   }

@@ -29,6 +29,7 @@ import {
   type ToolLifecycleItemType,
   type ThreadId,
   type TurnId,
+  isThinkingTraceMessage,
 } from "@t3tools/contracts";
 
 import {
@@ -1614,12 +1615,13 @@ export function createMessageAttachmentPreviewProjector() {
   };
 }
 
-const streamsText = (role: ChatMessage["role"]) => role === "assistant" || role === "reasoning";
+const streamsText = (message: ChatMessage) =>
+  message.role === "assistant" || isThinkingTraceMessage(message);
 
 /** Text and update time do not change a streaming message's timeline structure. */
 export function isStreamingMessageTextUpdate(previous: ChatMessage, next: ChatMessage): boolean {
   if (
-    !streamsText(previous.role) ||
+    !streamsText(previous) ||
     previous.role !== next.role ||
     !previous.streaming ||
     !next.streaming

@@ -2,7 +2,7 @@ import type { ChatAttachment } from "@t3tools/contracts";
 import { assistantCitationsToPlainText } from "@t3tools/shared/assistantCitations";
 
 export type ThreadTitleMessage = {
-  readonly role: "user" | "assistant" | "system" | "reasoning";
+  readonly role: "user" | "assistant" | "system";
   readonly text: string;
   readonly attachments?: ReadonlyArray<ChatAttachment> | undefined;
 };
@@ -25,13 +25,9 @@ export function limitTitleMessage(text: string, budget: number): string {
 /** Reserve space for user intent before adding assistant findings, in conversation order. */
 export function formatThreadTitleContext(messages: ReadonlyArray<ThreadTitleMessage>) {
   const sections = messages.flatMap((message, index) => {
-    // Thinking traces are working notes, not what the thread is about, and they
-    // dwarf the answer they precede. Titling on them would be worse and costlier.
-    if (
-      message.role === "system" ||
-      message.role === "reasoning" ||
-      (!message.text.trim() && !message.attachments?.length)
-    )
+    // Thinking traces (system role + reasoning: message ids) and other system
+    // notices are working notes, not what the thread is about.
+    if (message.role === "system" || (!message.text.trim() && !message.attachments?.length))
       return [];
     return [{ index, message, prefix: `${message.role.toUpperCase()}:\n` }];
   });

@@ -46,11 +46,11 @@ describe("thread title context", () => {
     expect(formatThreadTitleContext([])).toEqual({ message: "", attachments: [] });
   });
 
-  it("omits reasoning traces from generated titles", () => {
+  it("omits system/thinking traces from generated titles", () => {
     expect(
       formatThreadTitleContext([
         { role: "user", text: "Fix pairing" },
-        { role: "reasoning", text: "Consider token expiry, then the QR payload." },
+        { role: "system", text: "Consider token expiry, then the QR payload." },
         { role: "assistant", text: "The QR token expired." },
       ]).message,
     ).toBe("USER:\nFix pairing\n\nASSISTANT:\nThe QR token expired.");

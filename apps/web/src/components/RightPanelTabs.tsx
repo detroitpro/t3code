@@ -82,6 +82,11 @@ interface RightPanelTabsProps {
   mode: PreviewPanelMode;
   maximized?: boolean;
   open?: boolean;
+  /**
+   * When true, skip PreviewPanelShell so a parent (e.g. RightSidebarStack) can
+   * own width and stack a docked terminal under this surface.
+   */
+  withoutShell?: boolean;
   /** Forwarded to PreviewPanelShell so this surface persists its own width. */
   widthStorageKey?: string;
   /** Forwarded to PreviewPanelShell as the initial width before a user resize. */
@@ -1102,21 +1107,17 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
     return () => viewport.removeEventListener("wheel", handleWheel);
   }, [updateTabScrollState]);
 
-  return (
-    <PreviewPanelShell
-      mode={props.mode}
-      {...(props.maximized !== undefined ? { maximized: props.maximized } : {})}
-      {...(props.open !== undefined ? { open: props.open } : {})}
-      {...(props.widthStorageKey !== undefined ? { widthStorageKey: props.widthStorageKey } : {})}
-      {...(props.defaultWidth !== undefined ? { defaultWidth: props.defaultWidth } : {})}
-    >
+  const reserveInlineTitlebarControls = props.mode === "inline" && !props.layoutControls;
+
+  const body = (
+    <>
       <div
         className={cn(
           "flex h-[var(--workspace-topbar-height)] min-h-[var(--workspace-topbar-height)] shrink-0 items-center gap-1 pl-2",
           // The sheet overlays from the viewport top, so its tab bar keeps
           // the titlebar's height: a compact row re-centers the layout
           // controls a few pixels higher and the cluster jumps on open.
-          props.mode === "inline" && !props.layoutControls ? "pr-28" : "pr-3",
+          reserveInlineTitlebarControls ? "pr-28" : "pr-3",
           ownsDesktopTitleBar && "drag-region",
           ownsDesktopTitleBar &&
             (props.layoutControls
@@ -1423,6 +1424,22 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
           props.children
         )}
       </div>
+    </>
+  );
+
+  if (props.withoutShell) {
+    return <div className="flex h-full min-h-0 min-w-0 flex-col">{body}</div>;
+  }
+
+  return (
+    <PreviewPanelShell
+      mode={props.mode}
+      {...(props.maximized !== undefined ? { maximized: props.maximized } : {})}
+      {...(props.open !== undefined ? { open: props.open } : {})}
+      {...(props.widthStorageKey !== undefined ? { widthStorageKey: props.widthStorageKey } : {})}
+      {...(props.defaultWidth !== undefined ? { defaultWidth: props.defaultWidth } : {})}
+    >
+      {body}
     </PreviewPanelShell>
   );
 }

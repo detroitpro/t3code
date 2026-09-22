@@ -2323,6 +2323,18 @@ export default function ChatView(props: ChatViewProps) {
     useRightPanelStore.getState().reconcileFileSurfaces(activeThreadRef, activeProject !== null);
   }, [activeEnvironmentBootstrapComplete, activeProject, activeThreadRef]);
 
+  useEffect(() => {
+    if (
+      !activeThreadRef ||
+      !clientSettingsHydrated ||
+      shouldUseRightPanelSheet ||
+      activeProject === null
+    ) {
+      return;
+    }
+    useRightPanelStore.getState().seedFilesOnNewThread(activeThreadRef);
+  }, [activeProject, activeThreadRef, clientSettingsHydrated, shouldUseRightPanelSheet]);
+
   // Compute the list of environments this logical project spans, used to
   // drive the environment picker in BranchToolbar.
   const allProjects = useProjects();

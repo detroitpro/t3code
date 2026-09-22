@@ -19,6 +19,11 @@ export interface ElectronMenuContextInput {
   readonly position: Option.Option<ElectronMenuPosition>;
 }
 
+export interface ElectronMenuApplicationPopupInput {
+  readonly window: Electron.BrowserWindow;
+  readonly position: ElectronMenuPosition;
+}
+
 export interface ElectronMenuTemplateInput {
   readonly window: Electron.BrowserWindow;
   readonly template: readonly Electron.MenuItemConstructorOptions[];
@@ -27,6 +32,7 @@ export interface ElectronMenuTemplateInput {
 
 const ElectronMenuOperation = Schema.Literals([
   "set-application-menu",
+  "popup-application-menu",
   "popup-template",
   "show-context-menu",
 ]);
@@ -52,6 +58,9 @@ export class ElectronMenu extends Context.Service<
   {
     readonly setApplicationMenu: (
       template: readonly Electron.MenuItemConstructorOptions[],
+    ) => Effect.Effect<void>;
+    readonly popupApplicationMenu: (
+      input: ElectronMenuApplicationPopupInput,
     ) => Effect.Effect<void>;
     readonly showContextMenu: (
       input: ElectronMenuContextInput,
@@ -199,6 +208,26 @@ export const make = Effect.gen(function* () {
             platform,
             windowId: null,
             itemCount: template.length,
+            cause,
+          }),
+      }).pipe(Effect.orDie),
+    // The application menu is only installed once, so the caller asks for the
+    // live one rather than rebuilding a template it would have to keep in sync.
+    popupApplicationMenu: (input) =>
+      Effect.try({
+        try: () => {
+          Electron.Menu.getApplicationMenu()?.popup({
+            window: input.window,
+            x: input.position.x,
+            y: input.position.y,
+          });
+        },
+        catch: (cause) =>
+          new ElectronMenuOperationError({
+            operation: "popup-application-menu",
+            platform,
+            windowId: input.window.id,
+            itemCount: 0,
             cause,
           }),
       }).pipe(Effect.orDie),

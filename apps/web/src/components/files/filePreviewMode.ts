@@ -13,6 +13,18 @@ export function shouldShowFileExplorer(input: {
   return input.explorerOpen || input.relativePath === null;
 }
 
+/**
+ * Keep the explorer as a right rail (fixed/resizable width) instead of letting
+ * it flex-fill the surface. Empty selection keeps the rail so a placeholder can
+ * sit on the left; a directory selection still fills with the tree.
+ */
+export function shouldKeepFileExplorerRail(input: {
+  readonly previewPath: string | null;
+  readonly relativePath: string | null;
+}): boolean {
+  return input.previewPath !== null || input.relativePath === null;
+}
+
 export function setMarkdownTaskChecked(
   markdown: string,
   markerOffset: number,

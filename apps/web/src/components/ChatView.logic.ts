@@ -298,6 +298,7 @@ export type HeldThreadTimeline<T extends readonly unknown[]> = {
   threadKey: string | null;
   entries: T;
   markdownCwd?: string | null;
+  projectWorkspaceRoot?: string | null;
   workspaceRoot?: string | null;
 };
 

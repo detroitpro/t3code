@@ -84,6 +84,7 @@ import { projectFileCacheKey, projectFileEditorCacheKey } from "./fileContentRev
 import {
   isMarkdownPreviewFile,
   setMarkdownTaskChecked,
+  shouldKeepFileExplorerRail,
   shouldShowFileExplorer,
 } from "./filePreviewMode";
 import { useFileSaveCoordinator } from "./useFileSaveCoordinator";
@@ -967,7 +968,13 @@ export default function FilePreviewPanel({
     explorerOpen,
     attachmentOpen: attachment !== undefined,
   });
-  const resizableExplorer = showExplorer && previewPath !== null;
+  // No selection: keep the document column + rail. Directory reveal: tree fills.
+  const emptySelection = relativePath === null && attachment === undefined;
+  const keepExplorerRail = shouldKeepFileExplorerRail({
+    previewPath,
+    relativePath,
+  });
+  const resizableExplorer = showExplorer && keepExplorerRail;
   const { width: explorerWidth, handlers: explorerResizeHandlers } = useResizableWidth({
     storageKey: FILE_EXPLORER_WIDTH_STORAGE_KEY,
     defaultWidth: FILE_EXPLORER_DEFAULT_WIDTH,
@@ -1192,9 +1199,17 @@ export default function FilePreviewPanel({
       ) : null}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div
-          className={cn("min-w-0 flex-1 flex-col overflow-hidden", previewPath ? "flex" : "hidden")}
+          className={cn(
+            "min-w-0 flex-1 flex-col overflow-hidden",
+            previewPath || emptySelection ? "flex" : "hidden",
+          )}
         >
-          {isDirectory ? null : relativePath && attachment ? (
+          {emptySelection ? (
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-6 text-center">
+              <p className="text-sm text-muted-foreground">No file selected</p>
+              <p className="text-xs text-muted-foreground/70">Select a file to open it here.</p>
+            </div>
+          ) : isDirectory ? null : relativePath && attachment ? (
             <AttachmentFilePreview
               key={`${environmentId}:${attachment.id}`}
               name={attachment.name}
@@ -1301,7 +1316,7 @@ export default function FilePreviewPanel({
           <aside
             className={cn(
               "relative flex min-h-0 shrink-0 bg-background",
-              previewPath ? "border-l border-border/60" : "min-w-0 flex-1",
+              keepExplorerRail ? "border-l border-border/60" : "min-w-0 flex-1",
             )}
             style={resizableExplorer ? { width: `${explorerWidth}px` } : undefined}
           >

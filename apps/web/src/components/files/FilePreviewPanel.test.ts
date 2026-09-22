@@ -8,6 +8,7 @@ import {
 import {
   isMarkdownPreviewFile,
   setMarkdownTaskChecked,
+  shouldKeepFileExplorerRail,
   shouldShowFileExplorer,
 } from "./filePreviewMode";
 
@@ -101,6 +102,32 @@ describe("shouldShowFileExplorer", () => {
         relativePath: "docs/report.pdf",
         explorerOpen: false,
         attachmentOpen: false,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("shouldKeepFileExplorerRail", () => {
+  it("keeps the right rail for an open file and for empty selection", () => {
+    expect(
+      shouldKeepFileExplorerRail({
+        previewPath: "docs/report.md",
+        relativePath: "docs/report.md",
+      }),
+    ).toBe(true);
+    expect(
+      shouldKeepFileExplorerRail({
+        previewPath: null,
+        relativePath: null,
+      }),
+    ).toBe(true);
+  });
+
+  it("lets the tree fill when a directory is selected", () => {
+    expect(
+      shouldKeepFileExplorerRail({
+        previewPath: null,
+        relativePath: "docs",
       }),
     ).toBe(false);
   });

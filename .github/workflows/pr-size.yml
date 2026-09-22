@@ -1,8 +1,8 @@
 name: PR Size
 
+# Fork: disabled. Size labels are unused for our UI workflow (issue #21).
 on:
-  pull_request_target:
-    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
+  workflow_dispatch:
 
 permissions:
   contents: read

@@ -131,12 +131,16 @@ shortcut such as `alt+w`.
 Many defaults include `!terminalFocus` so they do not intercept terminal input.
 Keep that condition when remapping them if you want the same behavior.
 
-## Desktop application menu
+## Application menus
 
-T3 Code draws its own titlebar, so on Windows and Linux the File / Edit / View /
-Window / Help menus have no menubar strip to live in. Tap `Alt` and release it
-without pressing anything else to open the menu below the titlebar. macOS keeps
-the usual system menu bar.
+The File, View, Thread, Go and Help menus sit in the bar across the top of the
+window. In the desktop app on Windows and Linux, tap `Alt` and release it
+without pressing anything else to open them from the keyboard; tap it again to
+close them. On macOS the desktop app leaves the menus to the system menu bar at
+the top of the screen.
+
+Menu items show the shortcut you have bound to them, so a rebound command is
+labelled with your key, not the default.
 
 ## Desktop quit shortcut
 

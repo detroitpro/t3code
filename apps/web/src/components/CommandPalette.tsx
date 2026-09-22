@@ -31,6 +31,7 @@ import {
   type EnvironmentId,
   type EnvironmentMachineKind,
   type FilesystemBrowseResult,
+  type KeybindingCommand,
   type ProjectId,
   type SourceControlDiscoveryResult,
   type SourceControlProviderKind,
@@ -179,6 +180,7 @@ import { ThreadRowLeadingStatus, ThreadRowTrailingStatus } from "./ThreadStatusI
 import { primaryServerKeybindingsAtom, primaryServerProvidersAtom } from "../state/server";
 import { deriveProviderInstanceEntries, type ProviderInstanceEntry } from "../providerInstances";
 import { resolveShortcutCommand, threadJumpIndexFromCommand } from "../keybindings";
+import { subscribeAppCommand } from "./primaryBar/appCommandBus";
 import { CommandDialog, CommandDialogPopup, CommandFooterAction } from "./ui/command";
 import { Button } from "./ui/button";
 import { Kbd, KbdGroup } from "./ui/kbd";
@@ -468,6 +470,13 @@ function overlayModeForCommand(command: string | null): SearchOverlayMode | null
     : null;
 }
 
+// A menu pick has no keyboard event to suppress, and never repeats.
+const MENU_COMMAND_EVENT = {
+  preventDefault: () => {},
+  stopPropagation: () => {},
+  repeat: false,
+};
+
 export function CommandPalette({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reduceCommandPaletteUiState, {
     open: false,
@@ -514,19 +523,13 @@ export function CommandPalette({ children }: { children: ReactNode }) {
   }, [state.mode, state.open, toggleMode]);
 
   useEffect(() => {
-    const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.defaultPrevented) return;
-      // Resolve with the complete shortcut context so customized bindings
-      // using any documented `when` condition (e.g. previewFocus) work.
-      const command = resolveShortcutCommand(event, keybindings, {
-        context: {
-          terminalFocus: isTerminalFocused(),
-          terminalOpen,
-          previewFocus: isPreviewFocused(),
-          previewOpen,
-          modelPickerOpen: composerHandleRef.current?.isModelPickerOpen() ?? false,
-        },
-      });
+    // One definition of what each command does, shared by the keybinding below
+    // and by the menus, which arrive through the app command bus with no event
+    // to consume.
+    const runCommand = (
+      command: KeybindingCommand | null,
+      event: { preventDefault: () => void; stopPropagation: () => void; repeat: boolean },
+    ) => {
       if (command === "appearance.cycle") {
         event.preventDefault();
         event.stopPropagation();
@@ -569,8 +572,31 @@ export function CommandPalette({ children }: { children: ReactNode }) {
       event.stopPropagation();
       toggleMode(mode);
     };
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      // Resolve with the complete shortcut context so customized bindings
+      // using any documented `when` condition (e.g. previewFocus) work.
+      runCommand(
+        resolveShortcutCommand(event, keybindings, {
+          context: {
+            terminalFocus: isTerminalFocused(),
+            terminalOpen,
+            previewFocus: isPreviewFocused(),
+            previewOpen,
+            modelPickerOpen: composerHandleRef.current?.isModelPickerOpen() ?? false,
+          },
+        }),
+        event,
+      );
+    };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    const unsubscribeAppCommand = subscribeAppCommand((command) =>
+      runCommand(command, MENU_COMMAND_EVENT),
+    );
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      unsubscribeAppCommand();
+    };
   }, [
     appearanceMode,
     keybindings,

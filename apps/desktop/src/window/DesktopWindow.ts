@@ -31,10 +31,11 @@ import * as ElectronApp from "../electron/ElectronApp.ts";
 import { makeMenuRevealHandler } from "./MenuReveal.ts";
 import { makeQuitShortcutHandler } from "./QuitHold.ts";
 
-const TITLEBAR_HEIGHT = 40;
+/** Titlebar height, matching `--workspace-topbar-height` in the renderer. */
+export const TITLEBAR_HEIGHT = 40;
 // Matches --workspace-topbar-height in apps/web/src/index.css. Native macOS
 // buttons are 14 points tall and do not scale with the renderer's zoom.
-const MACOS_WORKSPACE_TOPBAR_HEIGHT = 52;
+const MACOS_WORKSPACE_TOPBAR_HEIGHT = TITLEBAR_HEIGHT;
 const MACOS_WINDOW_BUTTON_RADIUS = 7;
 
 function syncMacosWindowButtons(window: Electron.BrowserWindow): void {
@@ -654,20 +655,19 @@ export const make = Effect.gen(function* () {
         void runPromise(electronApp.quit);
       },
     });
-    // macOS keeps a real system menu bar; every other platform hides the frame
-    // that would host one (see getWindowTitleBarOptions), so Alt has to open
-    // the menu itself.
+    // macOS keeps a real system menu bar; every other platform draws our own
+    // menu bar in the renderer (see getWindowTitleBarOptions), so Alt hands
+    // keyboard focus to that HTML menu bar instead of popping a native one.
     const menuRevealHandler =
       environment.platform === "darwin"
         ? undefined
         : makeMenuRevealHandler({
             reveal: () => {
               if (window.isDestroyed()) return;
+              // The window is already focused for the key to have arrived, so
+              // revealing it again would only steal the foreground.
               runFork(
-                electronMenu.popupApplicationMenu({
-                  window,
-                  position: { x: 0, y: TITLEBAR_HEIGHT },
-                }),
+                dispatchRendererEvent(MENU_ACTION_CHANNEL, "focus-menubar", { reveal: false }),
               );
             },
           });

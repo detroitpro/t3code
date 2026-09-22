@@ -6,6 +6,7 @@ import { PreviewPanelShell } from "./preview/PreviewPanelShell";
 
 export {
   clampDockedTerminalHeight,
+  maxDockedTerminalHeight,
   RIGHT_SIDEBAR_MIN_TERMINAL_HEIGHT,
   RIGHT_SIDEBAR_MIN_TOP_PANE_HEIGHT,
   rightSidebarColumnOpen,

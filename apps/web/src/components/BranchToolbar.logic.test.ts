@@ -1,4 +1,4 @@
-import { EnvironmentId, type VcsRef } from "@t3tools/contracts";
+import { EnvironmentId, ProjectId, type VcsRef } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 import {
   dedupeRemoteBranchesWithLocalMatches,
@@ -16,6 +16,8 @@ import {
   resolveLocalCheckoutBranchMismatch,
   resolvePreviousWorktreeLabel,
   resolvePreviousWorktreeSeed,
+  resolveProjectHostOptions,
+  type ProjectHostCandidate,
   sanitizeNewRefName,
   shouldIncludeBranchPickerItem,
   shouldShowComposerContextStrip,
@@ -386,40 +388,156 @@ describe("resolveEnvironmentOptionLabel", () => {
 });
 
 describe("shouldShowEnvironmentIndicator", () => {
-  it("shows the indicator whenever multiple environments are pickable", () => {
-    expect(
-      shouldShowEnvironmentIndicator({
-        activeEnvironment: { isPrimary: true },
-        canPickEnvironment: true,
-      }),
-    ).toBe(true);
-  });
-
   it("shows a sole remote environment so the user knows where the project runs", () => {
-    expect(
-      shouldShowEnvironmentIndicator({
-        activeEnvironment: { isPrimary: false },
-        canPickEnvironment: false,
-      }),
-    ).toBe(true);
+    expect(shouldShowEnvironmentIndicator({ activeEnvironment: { isPrimary: false } })).toBe(true);
   });
 
-  it("hides a sole primary (this-device) environment", () => {
-    expect(
-      shouldShowEnvironmentIndicator({
-        activeEnvironment: { isPrimary: true },
-        canPickEnvironment: false,
-      }),
-    ).toBe(false);
+  it("shows a sole primary (this-device) environment as a static label", () => {
+    expect(shouldShowEnvironmentIndicator({ activeEnvironment: { isPrimary: true } })).toBe(true);
   });
 
   it("hides the indicator when the active environment is unknown", () => {
+    expect(shouldShowEnvironmentIndicator({ activeEnvironment: null })).toBe(false);
+  });
+});
+
+describe("resolveProjectHostOptions", () => {
+  const canonicalKey = "github.com/example/shared-repo";
+  const describeEnvironment = (environmentId: EnvironmentId) => ({
+    label: environmentId === localEnvironmentId ? "This device" : "Build box",
+    machine: "server" as const,
+  });
+
+  function makeProject(overrides: Partial<ProjectHostCandidate> = {}): ProjectHostCandidate {
+    return {
+      id: ProjectId.make("project-local"),
+      environmentId: localEnvironmentId,
+      workspaceRoot: "/home/dev/shared-repo",
+      repositoryIdentity: {
+        canonicalKey,
+        locator: {
+          source: "git-remote",
+          remoteName: "origin",
+          remoteUrl: "https://github.com/example/shared-repo.git",
+        },
+      },
+      ...overrides,
+    };
+  }
+
+  const localProject = makeProject();
+  const remoteProject = makeProject({
+    id: ProjectId.make("project-remote"),
+    environmentId: remoteEnvironmentId,
+    workspaceRoot: "/srv/checkouts/shared-repo",
+  });
+
+  it("returns nothing without an active project", () => {
     expect(
-      shouldShowEnvironmentIndicator({
-        activeEnvironment: null,
-        canPickEnvironment: false,
+      resolveProjectHostOptions({
+        activeProject: null,
+        projects: [localProject],
+        primaryEnvironmentId: localEnvironmentId,
+        describeEnvironment,
       }),
-    ).toBe(false);
+    ).toEqual([]);
+  });
+
+  it("offers the single machine holding the project", () => {
+    expect(
+      resolveProjectHostOptions({
+        activeProject: localProject,
+        projects: [localProject],
+        primaryEnvironmentId: localEnvironmentId,
+        describeEnvironment,
+      }),
+    ).toEqual([
+      {
+        environmentId: localEnvironmentId,
+        projectId: localProject.id,
+        label: "This device",
+        isPrimary: true,
+        machine: "server",
+      },
+    ]);
+  });
+
+  it("offers every machine sharing the repository, this device first", () => {
+    expect(
+      resolveProjectHostOptions({
+        activeProject: remoteProject,
+        projects: [remoteProject, localProject],
+        primaryEnvironmentId: localEnvironmentId,
+        describeEnvironment,
+      }).map((option) => option.environmentId),
+    ).toEqual([localEnvironmentId, remoteEnvironmentId]);
+  });
+
+  it("keeps matching by canonical remote when the sidebar separates the projects", () => {
+    // The sidebar's grouping mode is a display preference. A user who lists
+    // each checkout separately must still be able to run on either machine.
+    expect(
+      resolveProjectHostOptions({
+        activeProject: localProject,
+        projects: [localProject, remoteProject],
+        primaryEnvironmentId: localEnvironmentId,
+        describeEnvironment,
+      }),
+    ).toHaveLength(2);
+  });
+
+  it("excludes a project for a different repository", () => {
+    const otherRepo = makeProject({
+      id: ProjectId.make("project-other"),
+      environmentId: remoteEnvironmentId,
+      workspaceRoot: "/srv/checkouts/other-repo",
+      repositoryIdentity: {
+        canonicalKey: "github.com/example/other-repo",
+        locator: {
+          source: "git-remote",
+          remoteName: "origin",
+          remoteUrl: "https://github.com/example/other-repo.git",
+        },
+      },
+    });
+
+    expect(
+      resolveProjectHostOptions({
+        activeProject: localProject,
+        projects: [localProject, otherRepo],
+        primaryEnvironmentId: localEnvironmentId,
+        describeEnvironment,
+      }).map((option) => option.environmentId),
+    ).toEqual([localEnvironmentId]);
+  });
+
+  it("offers only its own machine for a project with no repository identity", () => {
+    const noIdentity = makeProject({ repositoryIdentity: null });
+
+    expect(
+      resolveProjectHostOptions({
+        activeProject: noIdentity,
+        projects: [noIdentity, remoteProject],
+        primaryEnvironmentId: localEnvironmentId,
+        describeEnvironment,
+      }).map((option) => option.environmentId),
+    ).toEqual([localEnvironmentId]);
+  });
+
+  it("lists a machine once when it holds the repository twice", () => {
+    const secondCheckout = makeProject({
+      id: ProjectId.make("project-local-2"),
+      workspaceRoot: "/home/dev/shared-repo-copy",
+    });
+
+    expect(
+      resolveProjectHostOptions({
+        activeProject: localProject,
+        projects: [localProject, secondCheckout],
+        primaryEnvironmentId: localEnvironmentId,
+        describeEnvironment,
+      }),
+    ).toHaveLength(1);
   });
 });
 

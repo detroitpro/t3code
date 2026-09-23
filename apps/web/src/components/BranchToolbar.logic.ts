@@ -6,6 +6,8 @@ import type {
   WorktreeSubmodules,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
+import type { EnvironmentProject } from "@t3tools/client-runtime/state/models";
+import { deriveLogicalProjectKey } from "../logicalProject";
 import { toSortableTimestamp } from "../lib/threadSort";
 export {
   dedupeRemoteBranchesWithLocalMatches,
@@ -50,15 +52,61 @@ export function resolveEnvironmentOptionLabel(input: {
   return runtimeLabel ?? savedLabel ?? input.environmentId;
 }
 
-// A remote (non-primary) environment is always surfaced, even when it is the
-// only environment available: with a single connected machine there is nothing
-// to pick, but the user still needs to see where the project runs.
+// Where a thread runs is always worth stating, even on a single-machine setup:
+// hiding it for "this device" made the machine a thread runs on discoverable
+// only by already owning a second one. With one machine the indicator is a
+// static label; with more it becomes the picker.
 export function shouldShowEnvironmentIndicator(input: {
   activeEnvironment: Pick<EnvironmentOption, "isPrimary"> | null;
-  canPickEnvironment: boolean;
 }): boolean {
-  if (input.canPickEnvironment) return true;
-  return input.activeEnvironment !== null && !input.activeEnvironment.isPrimary;
+  return input.activeEnvironment !== null;
+}
+
+export type ProjectHostCandidate = Pick<
+  EnvironmentProject,
+  "id" | "environmentId" | "workspaceRoot" | "repositoryIdentity"
+>;
+
+// The machines that can run a thread for this project. Membership is keyed on
+// the repository's canonical remote, deliberately ignoring the sidebar's
+// grouping mode: how a user likes their sidebar arranged must not change where
+// their work can run. A project with no repository identity falls back to its
+// own checkout, so it only ever offers the machine holding it.
+export function resolveProjectHostOptions(input: {
+  activeProject: ProjectHostCandidate | null;
+  projects: ReadonlyArray<ProjectHostCandidate>;
+  primaryEnvironmentId: EnvironmentId | null;
+  describeEnvironment: (environmentId: EnvironmentId) => {
+    label: string;
+    machine: EnvironmentMachineKind;
+  };
+}): EnvironmentOption[] {
+  const { activeProject } = input;
+  if (activeProject === null) return [];
+
+  const hostKey = deriveLogicalProjectKey(activeProject, { groupingMode: "repository" });
+  const seenEnvironments = new Set<EnvironmentId>();
+  const options: EnvironmentOption[] = [];
+
+  for (const project of input.projects) {
+    if (deriveLogicalProjectKey(project, { groupingMode: "repository" }) !== hostKey) continue;
+    if (seenEnvironments.has(project.environmentId)) continue;
+    seenEnvironments.add(project.environmentId);
+    const described = input.describeEnvironment(project.environmentId);
+    options.push({
+      environmentId: project.environmentId,
+      projectId: project.id,
+      label: described.label,
+      isPrimary: project.environmentId === input.primaryEnvironmentId,
+      machine: described.machine,
+    });
+  }
+
+  options.sort((a, b) => {
+    if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
+    return a.label.localeCompare(b.label);
+  });
+  return options;
 }
 
 export function shouldShowComposerContextStrip(input: {

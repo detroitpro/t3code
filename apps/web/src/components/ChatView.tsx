@@ -2312,11 +2312,10 @@ export default function ChatView(props: ChatViewProps) {
       : undefined;
   const handleOpenDraftProjectSettings = useCallback(() => {
     if (!activeDraftLogicalProjectKey) return;
-    void navigate({
-      to: "/projects/$projectKey",
-      params: { projectKey: activeDraftLogicalProjectKey },
+    openSettingsFromTarget("/settings/projects", {
+      search: { project: activeDraftLogicalProjectKey },
     });
-  }, [activeDraftLogicalProjectKey, navigate]);
+  }, [activeDraftLogicalProjectKey]);
   const activeEnvironmentShell = useEnvironmentQuery(
     activeThread ? environmentShell.stateAtom(activeThread.environmentId) : null,
   );

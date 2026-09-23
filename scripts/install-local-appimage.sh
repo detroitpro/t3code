@@ -4,7 +4,7 @@
 #
 #   ./scripts/install-local-appimage.sh
 #   ./scripts/install-local-appimage.sh --skip-build
-#   vp run install:desktop:local
+#   make i
 #
 # Defaults install a *separate* local launcher so the stock AppImage is kept:
 #   ~/Applications/T3-Code-local.AppImage
@@ -64,11 +64,12 @@ if [[ "$(uname -s)" != "Linux" ]]; then
 fi
 
 if [[ "$SKIP_BUILD" -eq 0 ]]; then
-  command -v vp >/dev/null 2>&1 || fail "vp not on PATH — run scripts/dev-bootstrap-local.sh first"
+  VP="$ROOT/node_modules/.bin/vp"
+  [[ -x "$VP" ]] || fail "repo-local vp missing — run: make deps"
   printf 'Building desktop AppImage (vp run dist:desktop:linux)...\n'
   (
     cd "$ROOT"
-    vp run dist:desktop:linux
+    "$VP" run dist:desktop:linux
   )
 fi
 

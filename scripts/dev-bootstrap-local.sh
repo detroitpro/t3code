@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
 # Fork-local workstation bootstrap for detroitpro/t3code.
-# Checks (and optionally installs) tooling needed for `vp run dev` and
-# `vp run dist:desktop:linux` on Ubuntu/Debian x86_64.
+# Checks (and optionally installs) tooling needed for repo-local `vp` and
+# `make dist` / AppImage builds on Ubuntu/Debian x86_64.
 #
 #   ./scripts/dev-bootstrap-local.sh           # check + print next steps
 #   ./scripts/dev-bootstrap-local.sh --fix    # apt-install missing build deps
 #   ./scripts/dev-bootstrap-local.sh --help
 #
+# Vite+ stays repo-local (node_modules/.bin/vp via pnpm). Do not curl-install
+# global Vite+ — it shims yarn/npm and breaks other checkouts.
+#
 # Does not open PRs against upstream. Does not touch ~/.t3/userdata.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VP_LOCAL="$ROOT/node_modules/.bin/vp"
+PNPM_VERSION="11.10.0"
 FIX=0
 CHECK_ONLY=0
 
@@ -22,8 +27,8 @@ Usage: scripts/dev-bootstrap-local.sh [--fix] [--check-only] [--help]
   --check-only  Exit 1 if anything required is missing (no hints beyond status).
   --help        Show this help.
 
-Checks Node 24, vp, Rust/cargo, and Linux AppImage build deps, then prints
-how to run `vp i`, `vp run dev`, and the local AppImage installer.
+Checks Node 24, repo-local vp (or pnpm to install it), Rust/cargo, and Linux
+AppImage build deps, then prints how to run `make deps` / `make dev`.
 EOF
 }
 
@@ -101,11 +106,24 @@ else
   status fail "node not on PATH — install Node 24 (nvm recommended)"
 fi
 
-# --- vp -------------------------------------------------------------------
-if have_cmd vp; then
-  status ok "vp ($(command -v vp))"
+# --- pnpm (bootstraps repo-local vp) --------------------------------------
+if have_cmd pnpm; then
+  status ok "pnpm $(pnpm --version 2>/dev/null || echo '?') ($(command -v pnpm))"
+elif have_cmd corepack; then
+  status warn "pnpm missing — enable with: corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate"
 else
-  status fail "vp not on PATH — install with: curl -fsSL https://vite.plus | bash"
+  status fail "pnpm/corepack missing — install Node 24 with corepack, then: make deps"
+fi
+
+# --- vp (repo-local only) -------------------------------------------------
+if [[ -x "$VP_LOCAL" ]]; then
+  vp_ver="$("$VP_LOCAL" --version 2>/dev/null | head -1 || true)"
+  status ok "repo-local vp (${VP_LOCAL}${vp_ver:+ — ${vp_ver}})"
+elif have_cmd vp; then
+  status warn "global vp at $(command -v vp) — prefer make deps (repo-local). Global Vite+ shims break Yarn Classic repos."
+  status fail "repo-local vp missing — run: make deps"
+else
+  status fail "repo-local vp missing — run: make deps"
 fi
 
 # --- Rust (resource monitor / desktop native bits) ------------------------
@@ -149,7 +167,7 @@ fi
 if [[ -d "$ROOT/node_modules" ]]; then
   status ok "node_modules present"
 else
-  status warn "node_modules missing — run: vp i"
+  status warn "node_modules missing — run: make deps"
 fi
 
 printf '\nSummary: %s ok, %s warn, %s fail\n' "$ok" "$warn" "$fail"
@@ -164,13 +182,15 @@ cat <<EOF
 Next steps
 ----------
   cd $ROOT
-  vp i
-  vp run dev                          # pair via the printed pairing URL
+  make deps                           # pnpm install → node_modules/.bin/vp
+  make dev                            # pair via the printed pairing URL
   # worktree state: $ROOT/.t3  (never use live ~/.t3/userdata for dev)
 
 Build + install a clickable local AppImage (taskbar):
-  vp run install:desktop:local        # builds then installs
+  make i                              # builds then installs
   # or: ./scripts/install-local-appimage.sh --help
+
+Do not install global Vite+ (curl https://vite.plus | bash) on this machine.
 
 See FORK.md for the fork-only workflow (GitHub work on detroitpro/t3code only).
 EOF

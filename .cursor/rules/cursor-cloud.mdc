@@ -10,15 +10,16 @@ developed in many places). They cover the pre-provisioned VM environment and non
 
 ## Toolchain
 
-Pre-installed and wired into login shells (`~/.bashrc`/`~/.profile`): Node 24 (via nvm), the global
-`vp` (Vite+) CLI, and its bundled pnpm. `vp` is the package manager + task runner for this repo
-(`vp i`, `vp check`, `vp run typecheck`, `vp test`, `vp run --filter <pkg> <script>`).
+Pre-installed on many Cloud images: Node 24 (via nvm). **This fork does not use a global `vp` CLI.** Install deps with `make deps` (pnpm → `node_modules/.bin/vp`). Prefer `make <target>` or `./node_modules/.bin/vp …` / `pnpm exec vp …`. Never `curl https://vite.plus | bash`.
+
+Package/task commands once local `vp` exists: `vp i`, `vp check`, `vp run typecheck`, `vp test`, `vp run --filter <pkg> <script>` (same as `make` wrappers where defined).
 
 - Node gotcha: the base image also ships an older Node on `/exec-daemon` that wins on `PATH` in
   non-login shells. Run commands in a login shell (`bash -lc '...'`) or prepend
   `$HOME/.nvm/versions/node/v24.13.1/bin` so Node 24 (`engines.node: ^24.13.1`) is used.
+  On the workstation, Cursor Agent’s bundled Node can also shadow nvm — put nvm’s bin first.
 - `vp check` also runs the formatter (not just lint); markdown edits must be formatter-clean. Run
-  `vp check --fix` before committing.
+  `vp check --fix` before committing (after `make deps`).
 
 ## Running the web app
 

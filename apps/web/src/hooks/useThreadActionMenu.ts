@@ -11,6 +11,7 @@ import type { ScopedThreadRef, ThreadId } from "@t3tools/contracts";
 import { useRouter } from "@tanstack/react-router";
 import { useCallback, useMemo } from "react";
 
+import { openSettingsFromTarget } from "../components/settings/settingsPresentationStore";
 import { resolveSnoozePresets } from "../components/Sidebar.snooze";
 import {
   buildThreadActionMenuItems,
@@ -187,9 +188,9 @@ export function useThreadActionMenu(input: {
             const projectKey =
               logicalProjectKeyByPhysicalKey.get(derivePhysicalProjectKey(project)) ??
               deriveLogicalProjectKeyFromSettings(project, projectGroupingSettings);
-            void router.navigate({
-              to: "/projects/$projectKey",
-              params: { projectKey },
+            openSettingsFromTarget("/settings/projects", {
+              search: { project: projectKey },
+              openedAtPathname: router.state.location.pathname,
             });
             return;
           }

@@ -24,6 +24,7 @@ import { PrimaryBarSlotProvider } from "./primaryBar/primaryBarSlots";
 import { SettingsEditorPlane } from "./settings/SettingsEditorPlane";
 import {
   closeSettings,
+  isWorkspaceReturnPath,
   openSettings,
   rememberRouterPathname,
   useSettingsPresentationStore,
@@ -129,7 +130,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   }, [isMacosDesktop]);
 
   useEffect(() => {
-    if (pathname.startsWith("/settings")) return;
+    if (!isWorkspaceReturnPath(pathname)) return;
     rememberRouterPathname(pathname);
     writeLastWorkspaceHref(workspaceHrefFromLocation({ pathname, searchStr, hash }));
   }, [hash, pathname, searchStr]);

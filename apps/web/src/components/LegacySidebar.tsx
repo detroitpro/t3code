@@ -82,6 +82,7 @@ import { isTerminalFocused } from "../lib/terminalFocus";
 import { isMacPlatform } from "../lib/utils";
 import { useSidebarPendingFileDropStore } from "../sidebarPendingFileDropStore";
 import { makeWorkspaceFileDropHandlers } from "./chat/workspaceFileDrop";
+import { openSettingsFromTarget } from "./settings/settingsPresentationStore";
 import {
   readThreadShell,
   useProjects,
@@ -1746,9 +1747,9 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
 
         actionHandlers.set("project-settings", () => {
           if (isMobile) setOpenMobile(false);
-          void router.navigate({
-            to: "/projects/$projectKey",
-            params: { projectKey: project.projectKey },
+          openSettingsFromTarget("/settings/projects", {
+            search: { project: project.projectKey },
+            openedAtPathname: router.state.location.pathname,
           });
         });
 
@@ -2256,9 +2257,9 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
 
       if (clicked === "project-settings") {
         if (isMobile) setOpenMobile(false);
-        void router.navigate({
-          to: "/projects/$projectKey",
-          params: { projectKey: project.projectKey },
+        openSettingsFromTarget("/settings/projects", {
+          search: { project: project.projectKey },
+          openedAtPathname: router.state.location.pathname,
         });
         return;
       }

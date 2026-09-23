@@ -25,6 +25,7 @@ import { SettingsEditorPlane } from "./settings/SettingsEditorPlane";
 import {
   closeSettings,
   openSettings,
+  rememberRouterPathname,
   useSettingsPresentationStore,
   workspaceHrefFromLocation,
   writeLastWorkspaceHref,
@@ -129,6 +130,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (pathname.startsWith("/settings")) return;
+    rememberRouterPathname(pathname);
     writeLastWorkspaceHref(workspaceHrefFromLocation({ pathname, searchStr, hash }));
   }, [hash, pathname, searchStr]);
 
@@ -149,14 +151,14 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
 
     const unsubscribe = onMenuAction((action) => {
       if (action === "open-settings") {
-        openSettings({ openedAtPathname: window.location.pathname });
+        openSettings({ openedAtPathname: pathname });
       }
     });
 
     return () => {
       unsubscribe?.();
     };
-  }, []);
+  }, [pathname]);
 
   return (
     <PanelAnimationSuppressionProvider value={panelAnimationsSuppressed}>

@@ -592,9 +592,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
 
   const openSourceControlSettings = useCallback(() => {
     handleOpenChange(false);
-    openSettingsFromTarget("/settings/source-control", {
-      openedAtPathname: window.location.pathname,
-    });
+    openSettingsFromTarget("/settings/source-control");
   }, [handleOpenChange, navigate]);
 
   return (

@@ -6,6 +6,7 @@ import {
   normalizeSettingsPlanePath,
   openSettings,
   openSettingsFromTarget,
+  rememberRouterPathname,
   useSettingsPresentationStore,
 } from "./settingsPresentationStore";
 
@@ -41,5 +42,13 @@ describe("settingsPresentationStore", () => {
     expect(normalizeSettingsPlanePath("/settings")).toBe("/settings/general");
     expect(isSettingsNavigationTarget("/settings/keybindings")).toBe(true);
     expect(isSettingsNavigationTarget("/usage")).toBe(false);
+  });
+
+  it("defaults openedAtPathname to the remembered router path, not the shell path", () => {
+    // Electron hash history keeps window.location.pathname at "/" while the
+    // app route lives in the hash; the store must latch the router path.
+    rememberRouterPathname("/env_abc/thread_xyz");
+    openSettings();
+    expect(useSettingsPresentationStore.getState().openedAtPathname).toBe("/env_abc/thread_xyz");
   });
 });

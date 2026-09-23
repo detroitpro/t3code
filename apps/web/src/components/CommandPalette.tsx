@@ -1512,7 +1512,7 @@ function OpenCommandPaletteDialog(props: {
   const openSourceControlSettings = useCallback(() => {
     setOpen(false);
     openSettingsFromTarget("/settings/source-control", {
-      openedAtPathname: window.location.pathname,
+      openedAtPathname: pathname,
     });
   }, [setOpen]);
 
@@ -1683,7 +1683,7 @@ function OpenCommandPaletteDialog(props: {
     if (addProjectEnvironmentOptions.length === 0) {
       setOpen(false);
       openSettingsFromTarget("/settings/connections", {
-        openedAtPathname: window.location.pathname,
+        openedAtPathname: pathname,
       });
       return;
     }
@@ -2067,7 +2067,7 @@ function OpenCommandPaletteDialog(props: {
     title: "Open settings",
     icon: <SettingsIcon className={ITEM_ICON_CLASS} />,
     run: async () => {
-      openSettings({ openedAtPathname: window.location.pathname });
+      openSettings({ openedAtPathname: pathname });
     },
   });
 
@@ -2124,7 +2124,7 @@ function OpenCommandPaletteDialog(props: {
     run: async () => {
       openSettingsFromTarget(item.to, {
         hash: item.targetId ?? item.id,
-        openedAtPathname: window.location.pathname,
+        openedAtPathname: pathname,
       });
     },
   }));

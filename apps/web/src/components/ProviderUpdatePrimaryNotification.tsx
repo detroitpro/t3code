@@ -151,7 +151,7 @@ export function ProviderUpdatePrimaryNotification() {
       ) {
         activeToastRef.current = null;
       }
-      openSettingsFromTarget("/settings/providers", { openedAtPathname: window.location.pathname });
+      openSettingsFromTarget("/settings/providers");
     },
     [navigate],
   );

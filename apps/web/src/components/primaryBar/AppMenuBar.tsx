@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import { MenuIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams } from "@tanstack/react-router";
+import { useLocation, useNavigate, useParams } from "@tanstack/react-router";
 
 import { isElectron } from "../../env";
 import { useIsMobile } from "../../hooks/useMediaQuery";
@@ -43,6 +43,7 @@ function useMenus(): ReadonlyArray<ResolvedMenu> {
 
 function useRunMenuAction(): (action: MenuAction) => void {
   const navigate = useNavigate();
+  const pathname = useLocation({ select: (location) => location.pathname });
 
   return useCallback(
     (action: MenuAction) => {
@@ -53,7 +54,7 @@ function useRunMenuAction(): (action: MenuAction) => void {
         case "navigate":
           if (isSettingsNavigationTarget(action.to)) {
             openSettingsFromTarget(action.to, {
-              openedAtPathname: window.location.pathname,
+              openedAtPathname: pathname,
             });
             return;
           }
@@ -73,7 +74,7 @@ function useRunMenuAction(): (action: MenuAction) => void {
           window.open(action.href, "_blank", "noopener,noreferrer");
       }
     },
-    [navigate],
+    [navigate, pathname],
   );
 }
 

@@ -40,6 +40,22 @@ const LAST_WORKSPACE_HREF_KEY = "t3.settings.lastWorkspaceHref";
 
 const DEFAULT_PATH: SettingsPlanePath = "/settings/general";
 
+/**
+ * Electron uses hash history (`main.tsx`), so `window.location.pathname` is the
+ * shell path (usually `/`), not the app route. Call sites must latch the router
+ * pathname; this module keeps the latest non-settings route as a fallback.
+ */
+let lastRouterPathname = "/";
+
+export function rememberRouterPathname(pathname: string): void {
+  if (!pathname || pathname.startsWith("/settings")) return;
+  lastRouterPathname = pathname;
+}
+
+export function readRouterPathname(): string {
+  return lastRouterPathname;
+}
+
 export function isSettingsPlanePath(pathname: string): pathname is SettingsPlanePath {
   return (
     pathname === "/settings/diagnostics" ||
@@ -107,10 +123,7 @@ export const useSettingsPresentationStore = create<SettingsPresentationState>((s
       scope: input.scope ?? (state.open ? state.scope : {}),
       providerInstanceId:
         input.providerInstanceId ?? (state.open ? state.providerInstanceId : undefined),
-      openedAtPathname:
-        input.openedAtPathname ??
-        state.openedAtPathname ??
-        (typeof window !== "undefined" ? window.location.pathname : "/"),
+      openedAtPathname: input.openedAtPathname ?? state.openedAtPathname ?? lastRouterPathname,
     })),
   closeSettings: () =>
     set({

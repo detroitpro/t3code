@@ -65,7 +65,7 @@ export function SidebarProviderUpdatePill() {
   }, [effectiveVisibleAfterIso, visibleAfterIso]);
 
   const openProviderSettings = useCallback(() => {
-    openSettingsFromTarget("/settings/providers", { openedAtPathname: window.location.pathname });
+    openSettingsFromTarget("/settings/providers");
   }, [navigate]);
   const displayedView = renderedView ?? view;
   const dismissAfterVisibleMs = displayedView?.dismissAfterVisibleMs;

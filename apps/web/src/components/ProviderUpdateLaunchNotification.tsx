@@ -114,7 +114,7 @@ function ProviderUpdateEnvironmentsNotification() {
       toastManager.close(active.toastId);
       activeToastRef.current = null;
     }
-    openSettingsFromTarget("/settings/providers", { openedAtPathname: window.location.pathname });
+    openSettingsFromTarget("/settings/providers");
   }, [navigate]);
 
   useEffect(() => {

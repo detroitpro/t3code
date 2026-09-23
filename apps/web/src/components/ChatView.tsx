@@ -4607,7 +4607,6 @@ export default function ChatView(props: ChatViewProps) {
     (instanceId: ProviderInstanceId) => {
       openSettingsFromTarget("/settings/providers", {
         search: { environmentId, instanceId },
-        openedAtPathname: window.location.pathname,
       });
     },
     [environmentId],

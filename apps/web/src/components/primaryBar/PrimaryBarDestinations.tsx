@@ -1,6 +1,6 @@
 import { ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
 import { useCallback } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useLocation, useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import { useEnvironments } from "../../state/environments";
@@ -42,6 +42,7 @@ function DestinationButton({
 /** Settings, Pull Requests and Usage, previously the sidebar footer icons. */
 export function PrimaryBarDestinations() {
   const navigate = useNavigate();
+  const pathname = useLocation({ select: (location) => location.pathname });
   const { environments } = useEnvironments();
   // The page reads every connected server, so one of them offering pull requests is enough for
   // the link to lead somewhere.
@@ -52,8 +53,8 @@ export function PrimaryBarDestinations() {
     void navigate({ to: "/pull-requests", search: readPullRequestListPreferences() });
   }, [navigate]);
   const handleSettingsClick = useCallback(() => {
-    openSettings({ openedAtPathname: window.location.pathname });
-  }, []);
+    openSettings({ openedAtPathname: pathname });
+  }, [pathname]);
   const handleUsageClick = useCallback(() => {
     void navigate({ to: "/usage" });
   }, [navigate]);

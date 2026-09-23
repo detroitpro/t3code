@@ -387,9 +387,9 @@ import { NoActiveThreadState } from "./NoActiveThreadState";
 import { subscribeAppCommand } from "./primaryBar/appCommandBus";
 import { PrimaryBarSlot } from "./primaryBar/primaryBarSlots";
 import {
-  type EnvironmentOption,
   resolveEffectiveEnvMode,
   resolveLocalCheckoutBranchMismatch,
+  resolveProjectHostOptions,
   shouldShowComposerContextStrip,
   shouldShowEnvironmentIndicator,
 } from "./BranchToolbar.logic";
@@ -2474,34 +2474,22 @@ export default function ChatView(props: ChatViewProps) {
     },
     [navigate, setEnvironmentEnabled],
   );
-  const logicalProjectEnvironments = useMemo(() => {
-    if (!activeProject) return [];
-    const logicalKey = deriveLogicalProjectKeyFromSettings(activeProject, projectGroupingSettings);
-    const memberProjects = allProjects.filter(
-      (p) => deriveLogicalProjectKeyFromSettings(p, projectGroupingSettings) === logicalKey,
-    );
-    const seen = new Set<string>();
-    const envs: EnvironmentOption[] = [];
-    for (const p of memberProjects) {
-      if (seen.has(p.environmentId)) continue;
-      seen.add(p.environmentId);
-      const isPrimary = p.environmentId === primaryEnvironmentId;
-      const environment = environmentById.get(p.environmentId) ?? null;
-      envs.push({
-        environmentId: p.environmentId,
-        projectId: p.id,
-        label: environment?.label ?? p.environmentId,
-        isPrimary,
-        machine: resolveEnvironmentMachineKind(environment?.serverConfig ?? null),
-      });
-    }
-    // Sort: primary first, then alphabetical
-    envs.sort((a, b) => {
-      if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
-      return a.label.localeCompare(b.label);
-    });
-    return envs;
-  }, [activeProject, allProjects, projectGroupingSettings, primaryEnvironmentId, environmentById]);
+  const logicalProjectEnvironments = useMemo(
+    () =>
+      resolveProjectHostOptions({
+        activeProject: activeProject ?? null,
+        projects: allProjects,
+        primaryEnvironmentId,
+        describeEnvironment: (environmentId) => {
+          const environment = environmentById.get(environmentId) ?? null;
+          return {
+            label: environment?.label ?? environmentId,
+            machine: resolveEnvironmentMachineKind(environment?.serverConfig ?? null),
+          };
+        },
+      }),
+    [activeProject, allProjects, primaryEnvironmentId, environmentById],
+  );
   const hasMultipleEnvironments = logicalProjectEnvironments.length > 1;
   const activeEnvironmentOption =
     logicalProjectEnvironments.find(
@@ -2509,7 +2497,6 @@ export default function ChatView(props: ChatViewProps) {
     ) ?? null;
   const showComposerEnvironmentIndicator = shouldShowEnvironmentIndicator({
     activeEnvironment: activeEnvironmentOption,
-    canPickEnvironment: hasMultipleEnvironments,
   });
 
   const openPullRequestDialog = useCallback(

@@ -49,6 +49,7 @@ import {
 } from "./settingsSearch";
 import { useAvailableSettingsSearchItems } from "./useAvailableSettingsSearchItems";
 import { validateSettingsScopeSearch } from "./settingsScope";
+import { useSettingsPresentationStore } from "./settingsPresentationStore";
 
 const SnapShotIcon = createLucideIcon("snap-shot", [
   [
@@ -104,11 +105,27 @@ function SettingsSectionIcon({ to }: { to: SettingsPath }) {
   return <Icon className="mt-0.5 size-3.5 shrink-0 text-sidebar-muted-foreground/60" />;
 }
 
-export function SettingsSidebarNav({ pathname }: { pathname: string }) {
+export function SettingsSidebarNav({
+  pathname,
+  hash,
+  variant = "sidebar",
+  onNavigateSection,
+}: {
+  pathname: string;
+  /** Override for plane mode, where the URL hash is not the settings target. */
+  hash?: string;
+  variant?: "sidebar" | "plane";
+  onNavigateSection?: (to: SettingsPath, hash?: string) => void;
+}) {
   const navigate = useNavigate();
-  const currentHash = useLocation({ select: (location) => location.hash });
+  const routeHash = useLocation({ select: (location) => location.hash });
+  const currentHash = hash ?? routeHash;
   const currentSearch = useLocation({ select: (location) => location.search });
-  const scopeSearch = useMemo(() => validateSettingsScopeSearch(currentSearch), [currentSearch]);
+  const planeScope = useSettingsPresentationStore((state) => state.scope);
+  const scopeSearch = useMemo(
+    () => (variant === "plane" ? planeScope : validateSettingsScopeSearch(currentSearch)),
+    [currentSearch, planeScope, variant],
+  );
   const navItems = SETTINGS_NAV_ITEMS.filter(
     (item) => item.to !== "/settings/projects" || isSettingsOverviewVisible(scopeSearch),
   );
@@ -120,6 +137,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const results = useMemo(() => searchSettings(query, searchableItems), [query, searchableItems]);
   const isSearching = query.trim().length > 0;
   const hasResults = results.length > 0;
+  const isPlane = variant === "plane";
 
   useEffect(() => {
     setActiveResultIndex((index) => Math.min(index, Math.max(results.length - 1, 0)));
@@ -167,8 +185,12 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
 
   const handleSectionClick = useCallback(
     (to: SettingsPath) => {
-      if (isMobile) {
+      if (isMobile && !isPlane) {
         setOpenMobile(false);
+      }
+      if (onNavigateSection) {
+        onNavigateSection(to, "");
+        return;
       }
       void navigate({
         to,
@@ -177,7 +199,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
         hashScrollIntoView: false,
       });
     },
-    [isMobile, navigate, setOpenMobile],
+    [isMobile, isPlane, navigate, onNavigateSection, setOpenMobile],
   );
   const clearSearch = useCallback(() => {
     setQuery("");
@@ -186,12 +208,16 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const handleSearchResultClick = useCallback(
     (item: SettingsSearchItem) => {
       clearSearch();
-      if (isMobile) {
+      if (isMobile && !isPlane) {
         setOpenMobile(false);
       }
       const targetId = item.targetId ?? item.id;
       if (pathname === item.to && currentHash.replace(/^#/, "") === targetId) {
         scrollToSettingsTarget(targetId);
+        return;
+      }
+      if (onNavigateSection) {
+        onNavigateSection(item.to, targetId);
         return;
       }
       void navigate({
@@ -202,7 +228,16 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
         state: { settingsTargetHighlight: true },
       });
     },
-    [clearSearch, currentHash, isMobile, navigate, pathname, setOpenMobile],
+    [
+      clearSearch,
+      currentHash,
+      isMobile,
+      isPlane,
+      navigate,
+      onNavigateSection,
+      pathname,
+      setOpenMobile,
+    ],
   );
   const handleSearchKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
@@ -231,119 +266,119 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
     },
     [activeResultIndex, clearSearch, handleSearchResultClick, isSearching, results],
   );
+  const searchAndNav = (
+    <SidebarGroup className="gap-2 p-[var(--sidebar-content-inset)]">
+      <div className="flex h-8 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground">
+        <SearchIcon className="size-4 shrink-0 text-sidebar-muted-foreground/80" />
+        <Input
+          ref={searchInputRef}
+          nativeInput
+          unstyled
+          type="search"
+          value={query}
+          onChange={(event) => {
+            setQuery(event.currentTarget.value);
+            setActiveResultIndex(0);
+          }}
+          onKeyDown={handleSearchKeyDown}
+          placeholder="Search"
+          aria-label="Search settings"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={isSearching && hasResults}
+          aria-controls={isSearching && hasResults ? "settings-search-results" : undefined}
+          aria-activedescendant={
+            isSearching && results[activeResultIndex]
+              ? `settings-search-result-${results[activeResultIndex].id}`
+              : undefined
+          }
+          className="min-w-0 flex-1 [&_[data-slot=input]]:h-auto [&_[data-slot=input]]:p-0 [&_[data-slot=input]]:leading-normal [&_[data-slot=input]]:text-sm [&_[data-slot=input]]:font-medium [&_[data-slot=input]]:text-sidebar-foreground [&_[data-slot=input]]:placeholder:text-sidebar-muted-foreground"
+        />
+        {isSearching ? (
+          <Button
+            type="button"
+            size="icon-micro"
+            variant="ghost"
+            className="shrink-0 text-sidebar-muted-foreground hover:bg-sidebar-control-surface hover:text-sidebar-foreground"
+            aria-label="Clear settings search"
+            onClick={() => {
+              clearSearch();
+              searchInputRef.current?.focus();
+            }}
+          >
+            <XIcon className="size-3" />
+          </Button>
+        ) : (
+          <Kbd className="h-4 min-w-0 rounded-sm px-1.5 text-[10px]">/</Kbd>
+        )}
+      </div>
+      {isSearching && results.length === 0 ? (
+        <p role="status" className="px-2 py-6 text-center text-xs text-sidebar-muted-foreground">
+          No settings found
+        </p>
+      ) : null}
+      {isSearching ? (
+        <SidebarMenu
+          className="ps-px"
+          id={hasResults ? "settings-search-results" : undefined}
+          role={hasResults ? "listbox" : undefined}
+          aria-label={hasResults ? "Settings search results" : undefined}
+        >
+          {results.map((item, index) => (
+            <SidebarMenuItem key={item.id} role="presentation">
+              <SidebarMenuButton
+                id={`settings-search-result-${item.id}`}
+                role="option"
+                aria-selected={index === activeResultIndex}
+                tabIndex={-1}
+                size="sm"
+                isActive={index === activeResultIndex}
+                className="h-auto min-h-10 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
+                onMouseMove={() => setActiveResultIndex(index)}
+                onClick={() => handleSearchResultClick(item)}
+              >
+                <SettingsSectionIcon to={item.to} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium text-sidebar-foreground">
+                    {item.title}
+                  </span>
+                  <span className="block truncate text-[11px] text-sidebar-muted-foreground/75">
+                    {SETTINGS_SECTION_LABELS[item.to]}
+                  </span>
+                </span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      ) : (
+        <SidebarMenu className="ps-px">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isGeneralDetailPage =
+              item.to === "/settings/general" && pathname === "/settings/open-source-licenses";
+            const isActive =
+              isGeneralDetailPage || pathname === item.to || pathname.startsWith(`${item.to}/`);
+            return (
+              <SidebarMenuItem key={item.to}>
+                <SidebarMenuButton isActive={isActive} onClick={() => handleSectionClick(item.to)}>
+                  <Icon />
+                  <span className="truncate">{item.label}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          })}
+        </SidebarMenu>
+      )}
+    </SidebarGroup>
+  );
+
+  if (isPlane) {
+    return <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden">{searchAndNav}</div>;
+  }
+
   return (
     <>
-      <SidebarContent className="overflow-x-hidden">
-        <SidebarGroup className="gap-2 p-[var(--sidebar-content-inset)]">
-          <div className="flex h-8 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground">
-            <SearchIcon className="size-4 shrink-0 text-sidebar-muted-foreground/80" />
-            <Input
-              ref={searchInputRef}
-              nativeInput
-              unstyled
-              type="search"
-              value={query}
-              onChange={(event) => {
-                setQuery(event.currentTarget.value);
-                setActiveResultIndex(0);
-              }}
-              onKeyDown={handleSearchKeyDown}
-              placeholder="Search"
-              aria-label="Search settings"
-              role="combobox"
-              aria-autocomplete="list"
-              aria-expanded={isSearching && hasResults}
-              aria-controls={isSearching && hasResults ? "settings-search-results" : undefined}
-              aria-activedescendant={
-                isSearching && results[activeResultIndex]
-                  ? `settings-search-result-${results[activeResultIndex].id}`
-                  : undefined
-              }
-              className="min-w-0 flex-1 [&_[data-slot=input]]:h-auto [&_[data-slot=input]]:p-0 [&_[data-slot=input]]:leading-normal [&_[data-slot=input]]:text-sm [&_[data-slot=input]]:font-medium [&_[data-slot=input]]:text-sidebar-foreground [&_[data-slot=input]]:placeholder:text-sidebar-muted-foreground"
-            />
-            {isSearching ? (
-              <Button
-                type="button"
-                size="icon-micro"
-                variant="ghost"
-                className="shrink-0 text-sidebar-muted-foreground hover:bg-sidebar-control-surface hover:text-sidebar-foreground"
-                aria-label="Clear settings search"
-                onClick={() => {
-                  clearSearch();
-                  searchInputRef.current?.focus();
-                }}
-              >
-                <XIcon className="size-3" />
-              </Button>
-            ) : (
-              <Kbd className="h-4 min-w-0 rounded-sm px-1.5 text-[10px]">/</Kbd>
-            )}
-          </div>
-          {isSearching && results.length === 0 ? (
-            <p
-              role="status"
-              className="px-2 py-6 text-center text-xs text-sidebar-muted-foreground"
-            >
-              No settings found
-            </p>
-          ) : null}
-          {isSearching ? (
-            <SidebarMenu
-              className="ps-px"
-              id={hasResults ? "settings-search-results" : undefined}
-              role={hasResults ? "listbox" : undefined}
-              aria-label={hasResults ? "Settings search results" : undefined}
-            >
-              {results.map((item, index) => (
-                <SidebarMenuItem key={item.id} role="presentation">
-                  <SidebarMenuButton
-                    id={`settings-search-result-${item.id}`}
-                    role="option"
-                    aria-selected={index === activeResultIndex}
-                    tabIndex={-1}
-                    size="sm"
-                    isActive={index === activeResultIndex}
-                    className="h-auto min-h-10 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
-                    onMouseMove={() => setActiveResultIndex(index)}
-                    onClick={() => handleSearchResultClick(item)}
-                  >
-                    <SettingsSectionIcon to={item.to} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-sidebar-foreground">
-                        {item.title}
-                      </span>
-                      <span className="block truncate text-[11px] text-sidebar-muted-foreground/75">
-                        {SETTINGS_SECTION_LABELS[item.to]}
-                      </span>
-                    </span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          ) : (
-            <SidebarMenu className="ps-px">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isGeneralDetailPage =
-                  item.to === "/settings/general" && pathname === "/settings/open-source-licenses";
-                const isActive =
-                  isGeneralDetailPage || pathname === item.to || pathname.startsWith(`${item.to}/`);
-                return (
-                  <SidebarMenuItem key={item.to}>
-                    <SidebarMenuButton
-                      isActive={isActive}
-                      onClick={() => handleSectionClick(item.to)}
-                    >
-                      <Icon />
-                      <span className="truncate">{item.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          )}
-        </SidebarGroup>
-      </SidebarContent>
+      <SidebarContent className="overflow-x-hidden">{searchAndNav}</SidebarContent>
       <SidebarFooter>
         <Suspense fallback={null}>
           <T3ConnectSidebarSignIn />

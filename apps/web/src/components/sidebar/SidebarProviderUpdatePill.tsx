@@ -12,6 +12,7 @@ import {
 } from "../ProviderUpdateLaunchNotification.logic";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { Button } from "../ui/button";
+import { openSettingsFromTarget } from "../settings/settingsPresentationStore";
 
 const PROVIDER_UPDATE_PILL_STYLES = {
   loading:
@@ -64,7 +65,7 @@ export function SidebarProviderUpdatePill() {
   }, [effectiveVisibleAfterIso, visibleAfterIso]);
 
   const openProviderSettings = useCallback(() => {
-    void navigate({ to: "/settings/providers" });
+    openSettingsFromTarget("/settings/providers");
   }, [navigate]);
   const displayedView = renderedView ?? view;
   const dismissAfterVisibleMs = displayedView?.dismissAfterVisibleMs;

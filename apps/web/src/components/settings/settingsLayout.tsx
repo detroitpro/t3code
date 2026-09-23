@@ -35,6 +35,7 @@ import {
   type SettingInheritanceState,
   type SettingOverridingProject,
 } from "./SettingInheritance";
+import { useSettingsPresentationStore } from "./settingsPresentationStore";
 
 const EMPTY_SETTING_KEYS: readonly (keyof ServerSettings)[] = [];
 
@@ -523,12 +524,21 @@ export function SettingsPageContainer({
   width?: WorkspacePageWidth;
 }) {
   const navigate = useNavigate();
-  const hash = useLocation({ select: (location) => location.hash });
+  const routeHash = useLocation({ select: (location) => location.hash });
   const highlightTarget = useLocation({
     select: (location) => location.state.settingsTargetHighlight !== false,
   });
+  const planeOpen = useSettingsPresentationStore((state) => state.open);
+  const planeHash = useSettingsPresentationStore((state) => state.hash);
+  const planePath = useSettingsPresentationStore((state) => state.path);
+  const setSettingsPath = useSettingsPresentationStore((state) => state.setSettingsPath);
+  const hash = planeOpen ? (planeHash ? `#${planeHash}` : "") : routeHash;
   const targetId = hash.replace(/^#/, "") || null;
   const clearTargetHash = useCallback(() => {
+    if (planeOpen) {
+      setSettingsPath(planePath, "");
+      return;
+    }
     void navigate({
       hash: "",
       replace: true,
@@ -536,7 +546,7 @@ export function SettingsPageContainer({
       hashScrollIntoView: false,
       state: { settingsTargetHighlight: true },
     });
-  }, [navigate]);
+  }, [navigate, planeOpen, planePath, setSettingsPath]);
 
   return (
     <SettingsSearchTargetProvider

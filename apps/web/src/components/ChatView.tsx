@@ -237,6 +237,8 @@ import { BranchToolbar, type BranchToolbarHandle } from "./BranchToolbar";
 import { resolveShortcutCommand, shortcutLabelForCommand } from "../keybindings";
 import { isEditableFocused } from "../lib/editableFocus";
 import ThreadTerminalDrawer from "./ThreadTerminalDrawer";
+import { openSettingsFromTarget } from "./settings/settingsPresentationStore";
+
 import {
   AlarmClockIcon,
   CheckCircle2Icon,
@@ -4603,12 +4605,11 @@ export default function ChatView(props: ChatViewProps) {
   }, [handleInteractionModeChange, interactionMode, interactionModeEnabled]);
   const openProviderSetup = useCallback(
     (instanceId: ProviderInstanceId) => {
-      void navigate({
-        to: "/settings/providers",
+      openSettingsFromTarget("/settings/providers", {
         search: { environmentId, instanceId },
       });
     },
-    [environmentId, navigate],
+    [environmentId],
   );
   const createBrowserSurface = useCallback(
     (profileId?: string) => {

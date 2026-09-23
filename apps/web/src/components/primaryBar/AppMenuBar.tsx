@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import { MenuIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams } from "@tanstack/react-router";
+import { useLocation, useNavigate, useParams } from "@tanstack/react-router";
 
 import { isElectron } from "../../env";
 import { useIsMobile } from "../../hooks/useMediaQuery";
@@ -15,6 +15,10 @@ import { runAppCommand } from "./appCommandBus";
 import { runDesktopAppCommand } from "./desktopAppCommands";
 import { resolveMenus, type MenuAction, type ResolvedMenu } from "./menuModel";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
+import {
+  isSettingsNavigationTarget,
+  openSettingsFromTarget,
+} from "../settings/settingsPresentationStore";
 
 function useMenus(): ReadonlyArray<ResolvedMenu> {
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
@@ -39,6 +43,7 @@ function useMenus(): ReadonlyArray<ResolvedMenu> {
 
 function useRunMenuAction(): (action: MenuAction) => void {
   const navigate = useNavigate();
+  const pathname = useLocation({ select: (location) => location.pathname });
 
   return useCallback(
     (action: MenuAction) => {
@@ -47,6 +52,12 @@ function useRunMenuAction(): (action: MenuAction) => void {
           runAppCommand(action.command);
           return;
         case "navigate":
+          if (isSettingsNavigationTarget(action.to)) {
+            openSettingsFromTarget(action.to, {
+              openedAtPathname: pathname,
+            });
+            return;
+          }
           void navigate(
             action.to === "/pull-requests"
               ? { to: action.to, search: readPullRequestListPreferences() }
@@ -63,7 +74,7 @@ function useRunMenuAction(): (action: MenuAction) => void {
           window.open(action.href, "_blank", "noopener,noreferrer");
       }
     },
-    [navigate],
+    [navigate, pathname],
   );
 }
 

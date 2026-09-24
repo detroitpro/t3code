@@ -47,8 +47,19 @@ const DEFAULT_PATH: SettingsPlanePath = "/settings/general";
  */
 let lastRouterPathname = "/";
 
+/**
+ * Paths that only exist to bridge into the settings plane (or other overlays).
+ * Never treat them as the workspace "home" to return to — doing so recreates a
+ * redirect loop with `/settings` after in-plane Settings (#38).
+ */
+export function isWorkspaceReturnPath(pathname: string): boolean {
+  return (
+    Boolean(pathname) && !pathname.startsWith("/settings") && !pathname.startsWith("/projects")
+  );
+}
+
 export function rememberRouterPathname(pathname: string): void {
-  if (!pathname || pathname.startsWith("/settings")) return;
+  if (!isWorkspaceReturnPath(pathname)) return;
   lastRouterPathname = pathname;
 }
 
@@ -83,14 +94,17 @@ export function normalizeSettingsPlanePath(pathname: string): SettingsPlanePath 
 export function readLastWorkspaceHref(): string | null {
   try {
     const value = sessionStorage.getItem(LAST_WORKSPACE_HREF_KEY);
-    return value && value.length > 0 && !value.startsWith("/settings") ? value : null;
+    if (!value || value.length === 0) return null;
+    const pathname = value.split(/[?#]/)[0] || "";
+    return isWorkspaceReturnPath(pathname) ? value : null;
   } catch {
     return null;
   }
 }
 
 export function writeLastWorkspaceHref(href: string): void {
-  if (!href || href.startsWith("/settings")) return;
+  const pathname = href.split(/[?#]/)[0] || "";
+  if (!isWorkspaceReturnPath(pathname)) return;
   try {
     sessionStorage.setItem(LAST_WORKSPACE_HREF_KEY, href);
   } catch {

@@ -79,6 +79,8 @@ import {
 } from "react";
 import { useParams, useRouter } from "@tanstack/react-router";
 
+import { openSettingsFromTarget } from "./settings/settingsPresentationStore";
+
 import { useRightPanelStore } from "../rightPanelStore";
 import {
   isAtomCommandInterrupted,
@@ -2484,9 +2486,9 @@ export default function Sidebar() {
       if (isMobile) {
         setOpenMobile(false);
       }
-      void router.navigate({
-        to: "/projects/$projectKey",
-        params: { projectKey: projectGroup.projectKey },
+      openSettingsFromTarget("/settings/projects", {
+        search: { project: projectGroup.projectKey },
+        openedAtPathname: router.state.location.pathname,
       });
     },
     [isMobile, router, setOpenMobile],

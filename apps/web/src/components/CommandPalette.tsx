@@ -2101,9 +2101,9 @@ function OpenCommandPaletteDialog(props: {
       description: contextualProjectGroup.displayName,
       icon: <FolderIcon className={ITEM_ICON_CLASS} />,
       run: async () => {
-        await navigate({
-          to: "/projects/$projectKey",
-          params: { projectKey: contextualProjectGroup.projectKey },
+        openSettingsFromTarget("/settings/projects", {
+          search: { project: contextualProjectGroup.projectKey },
+          openedAtPathname: pathname,
         });
       },
     });

@@ -29,7 +29,7 @@ to upstream.
 
 This fork’s own commits are almost all **web UI**. That does **not** mean skip
 other areas: if the release changes mobile, background, connect/relay, or
-anything else, **prefer take**. We simply avoid *authoring* fork-only work in
+anything else, **prefer take**. We simply avoid _authoring_ fork-only work in
 those areas.
 
 When triaging, flag path overlap with deliberate fork web-UI changes — those are
@@ -50,6 +50,7 @@ the upstream change fights fork intent (or is otherwise unwanted).
 
    Latest line = target tag `T`. Fetch it if missing locally:
    `git fetch upstream tag "$T" --no-tags`.
+
 3. Optional previous stable `T_prev`: the line before `T` in that sorted list
    (useful for release notes / grouping). Not required for the candidate range.
 4. If `git merge-base --is-ancestor "$T" origin/main`, report **already includes
@@ -79,6 +80,7 @@ or the user defers.
    Group adjacent commits that share one PR number (`(#NNNN)` in the subject)
    into a single triage unit; list every SHA in the unit. Prefer oldest-first
    (cherry-pick order).
+
 4. **Prior skips.** Search this fork’s issues
    (`gh issue list -R detroitpro/t3code --state all --search "upstream sync"`)
    and treat previously skipped SHAs/PRs as already decided unless the user

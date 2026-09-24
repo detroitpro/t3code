@@ -20,10 +20,12 @@ or operate on that GitHub repo beyond git sync when asked).
 
 ## Primary human CLI: `make`
 
+Agents: same CLI — prefer `make` over bare `vp`. Rule: `.cursor/rules/local-vp.mdc`. Skill: `local-vp`.
+
 ```bash
 make              # colorized menu
 make i            # install this checkout as local AppImage
-make deps         # vp i
+make deps         # pnpm install → repo-local node_modules/.bin/vp (then vp i)
 make dev          # web + server (alias: make d)
 make share        # dev --share
 make desktop      # Electron + server
@@ -31,17 +33,21 @@ make fmt lint tc  # format / lint / typecheck
 make test ARGS=apps/web/src/rightPanelStore.test.ts
 make dist         # AppImage only → release/
 make sync         # fetch + merge upstream/main
-make bootstrap    # check Node / vp / apt (alias: make b, make doctor)
+make bootstrap    # check Node / repo-local vp / apt (alias: make b, make doctor)
 make pair         # mint pairing token
 make clean
 ```
+
+Vite+ (`vp`) is **repo-local only**. `make` prepends `node_modules/.bin` and
+never requires a global `vp`. Do not run `curl https://vite.plus | bash` —
+global Vite+ shims yarn/npm and breaks other projects.
 
 ## Workstation bootstrap
 
 ```bash
 make bootstrap
 ./scripts/dev-bootstrap-local.sh --fix   # sudo apt-install missing build deps
-make deps
+make deps                                 # installs pnpm deps + local vp
 make dev                                  # use the printed pairing URL
 ```
 
@@ -59,7 +65,8 @@ make i
 Same underlying script (with extra flags if needed):
 
 ```bash
-vp run install:desktop:local
+make deps   # if node_modules/.bin/vp is missing
+./scripts/install-local-appimage.sh
 ./scripts/install-local-appimage.sh --skip-build
 ./scripts/install-local-appimage.sh --replace-stock   # also rewrites t3-code.desktop
 ```

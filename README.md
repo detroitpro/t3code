@@ -94,29 +94,18 @@ Building from source? Start at [docs/internals/overview.md](./docs/internals/ove
 
 ## If you REALLY want to contribute still.... read this first
 
-### Install `vp`
+### Install dependencies (repo-local `vp`)
 
-T3 Code uses Vite+ so you'll need to install the global `vp` command-line tool.
-
-#### macOS / Linux
+This fork does **not** use a global Vite+ install. Dependencies (and `node_modules/.bin/vp`) come from pnpm:
 
 ```bash
-curl -fsSL https://vite.plus | bash
+make deps          # preferred — also activates pnpm via corepack if needed
+# or: pnpm install
 ```
 
-#### Windows
+Day-to-day: `make d`, `make fmt`, `make lint`, `make tc`, `make test ARGS=…`. See [FORK.md](./FORK.md).
 
-```bash
-irm https://vite.plus/ps1 | iex
-```
-
-Checkout their getting started guide for more information: https://viteplus.dev/guide/
-
-### Install dependencies
-
-```bash
-vp i
-```
+Do **not** run `curl https://vite.plus | bash` — global Vite+ shims yarn/npm and breaks other projects on this machine.
 
 Read [CONTRIBUTING.md](./CONTRIBUTING.md) before reporting a bug or opening a PR.
 

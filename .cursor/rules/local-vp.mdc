@@ -1,0 +1,21 @@
+---
+description: Repo-local Vite+ (vp) only — never install global Vite+
+alwaysApply: true
+---
+
+# Local Vite+ (`vp`) only
+
+This fork keeps Vite+ **inside the checkout**. Global Vite+ shims `yarn`/`npm`/`node` and breaks other repos (Omni Yarn Classic, etc.).
+
+## Hard rules
+
+1. **Never** install global Vite+: no `curl https://vite.plus | bash`, no `irm https://vite.plus/ps1`, no putting `~/.local/share/vite-plus/bin` on login `PATH`.
+2. **Prefer `make <target>`** from the repo root (`make deps`, `make d`, `make fmt`, `make lint`, `make tc`, `make test ARGS=…`). The Makefile uses `node_modules/.bin/vp`.
+3. If you must invoke `vp` directly, use **`./node_modules/.bin/vp …`** or **`pnpm exec vp …`**, or export `PATH="$PWD/node_modules/.bin:$PATH"` for that shell only.
+4. If `vp` / `node_modules/.bin/vp` is missing: **`make deps`** (pnpm install → local `vp`). Do not curl-install.
+5. Bare `vp` on a default PATH is **not** required and should stay absent.
+
+## Docs
+
+- Human CLI: `FORK.md`, root `Makefile`
+- Shared agent defaults: `AGENTS.md` (Dev servers)

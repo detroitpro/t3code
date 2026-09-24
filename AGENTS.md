@@ -76,10 +76,11 @@ The most common defect in this repo is a change that works on the path you teste
 
 ## Dev servers
 
-- `vp i` installs. Worktrees get this from the t3.json setup script; if module resolution looks broken, it probably did not run.
-- `vp run dev` starts server and web. In a worktree, state defaults to that worktree's gitignored `.t3`, which deliberately outranks an ambient `T3CODE_HOME` so you cannot land on shared state by accident. An explicit `--home-dir` still wins.
+- **Vite+ is repo-local only.** Prefer `make <target>` (`make deps`, `make d`, `make fmt`, …). The Makefile calls `node_modules/.bin/vp`. If you invoke `vp` yourself, use `./node_modules/.bin/vp` / `pnpm exec vp` (or put `node_modules/.bin` on `PATH` for that shell). **Never** install global Vite+ (`curl https://vite.plus | bash`) — it shims yarn/npm and breaks other checkouts. See `FORK.md` and `.cursor/rules/local-vp.mdc`.
+- `make deps` (or `vp i` once local `vp` exists) installs. Worktrees get this from the t3.json setup script; if module resolution looks broken, it probably did not run.
+- `make d` / `vp run dev` starts server and web. In a worktree, state defaults to that worktree's gitignored `.t3`, which deliberately outranks an ambient `T3CODE_HOME` so you cannot land on shared state by accident. An explicit `--home-dir` still wins.
 - Ports derive from the worktree path and are stable across restarts, but read the real ones from the `[dev-runner]` line since occupied ports shift.
-- Sharing over the tailnet is three steps: run `vp run dev --share` in the background, wait for the `pairingUrl:` line in its output, then give that full URL to an unpaired browser. Do not wire up `tailscale serve` by hand, open the URL yourself, or consume the user's pairing link. A browser with the reusable dev cookie can use the bare origin. If a normal one-time token was consumed, mint a fresh one with `node apps/server/src/bin.ts pair`. It carries standard scopes, while the startup URL carries admin scopes needed for Connections settings.
+- Sharing over the tailnet is three steps: run `make share` or `vp run dev --share` in the background, wait for the `pairingUrl:` line in its output, then give that full URL to an unpaired browser. Do not wire up `tailscale serve` by hand, open the URL yourself, or consume the user's pairing link. A browser with the reusable dev cookie can use the bare origin. If a normal one-time token was consumed, mint a fresh one with `node apps/server/src/bin.ts pair`. It carries standard scopes, while the startup URL carries admin scopes needed for Connections settings.
 - To reuse web dev auth across worktrees, configure one fixed `T3CODE_DEV_AUTH_TOKEN` in the main checkout's gitignored `.env`. The `t3.json` setup links that file into worktrees. Never commit or publish the token or a startup URL. See [Reusable dev credential](docs/operations/development.md#reusable-dev-credential).
 - Stop what you started, by the PID you tracked. See rule 1.
 
@@ -103,9 +104,9 @@ An empty database is a bad test. Seed your worktree's `.t3` with a copy of real 
 
 ## Verifying
 
-- Smallest proof that the change works. `vp test run <files>` for the tests you touched, targeted lint and typecheck for the scope you changed.
+- Smallest proof that the change works. `make test ARGS=<files>` or `./node_modules/.bin/vp test run <files>` for the tests you touched, targeted lint and typecheck for the scope you changed.
 - Test meaningful logic or observable behavior. Do not render components to static markup to assert props or attributes, or add tests that merely assert callback wiring or mirror the implementation.
-- **Do not run repo-wide checks.** No `vp check`, no `vp run -r test`, no `vp run -r typecheck` unless I ask. CI owns the full suite.
+- **Do not run repo-wide checks.** No `vp check`, no `vp run -r test`, no `vp run -r typecheck` / `make tc` unless I ask. CI owns the full suite.
 - Backend behavior changes ship with focused tests for that behavior.
 - The server is event-sourced and its async flows emit typed receipts. Wait on receipts and worker drains, never on sleeps or polling. A test that needs a timeout to pass is wrong.
 - Upon request, user-visible frontend changes should get one integrated pass in a real client: `test-t3-app` for web, `test-t3-mobile` for mobile. The primary agent does this once after integrating. Subagents do not launch their own dev servers. Ask permission before doing computer use or spinning up browsers.

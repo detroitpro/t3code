@@ -1,0 +1,4 @@
+interface:
+  display_name: "Merge upstream"
+  short_description: "Triage and cherry-pick the latest stable upstream release"
+  default_prompt: "Use $merge-upstream to sync the latest stable upstream release (not tip-of-main): triage release commits/PRs one by one into a single plan issue, then cherry-pick takes. Never push anything back to upstream."

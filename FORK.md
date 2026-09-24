@@ -4,14 +4,17 @@ This fork tracks personal work that is **not** proposed elsewhere. Never open
 PRs, issues, or discussions against any other GitHub copy of T3 Code. GitHub
 work happens only on [`detroitpro/t3code`](https://github.com/detroitpro/t3code).
 
-Keep `main` current with the `upstream` **git** remote (fetch/merge only — never
-use that remote’s GitHub issues, PRs, or discussions):
+Keep useful upstream **stable releases** via the **`merge-upstream`** skill
+(latest `vX.Y.Z` tag only → triage → one GitHub plan issue on this fork →
+cherry-pick one by one). Fetch tags from the `upstream` **git** remote — never
+push to it, and never use that remote’s GitHub issues, PRs, or discussions.
+Do not sync tip-of-`upstream/main`, nightlies, or previews unless you mean to.
+
+Blunt full merge of tip-of-main (usually wrong for this fork):
 
 ```bash
-git fetch upstream
-git checkout main
-git merge upstream/main   # or rebase
-git push origin main
+make sync                 # fetch + merge upstream/main into the current branch
+git push origin HEAD      # push to this fork only
 ```
 
 If `upstream` is missing, add it once with `git remote add upstream <fork-source-url>`
@@ -32,7 +35,7 @@ make desktop      # Electron + server
 make fmt lint tc  # format / lint / typecheck
 make test ARGS=apps/web/src/rightPanelStore.test.ts
 make dist         # AppImage only → release/
-make sync         # fetch + merge upstream/main
+make sync         # blunt tip-of-main merge (prefer merge-upstream skill / stable)
 make bootstrap    # check Node / repo-local vp / apt (alias: make b, make doctor)
 make pair         # mint pairing token
 make clean

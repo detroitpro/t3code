@@ -321,12 +321,39 @@ describe("sortThreadsForListV2", () => {
     expect(sorted.map((thread) => thread.id)).toEqual(["new", "older-arranged", "newer-arranged"]);
   });
 
-  it("orders by creation time, newest first, ignoring activity", () => {
+  it("defaults to last user message, newest activity first", () => {
     const sorted = sortThreadsForListV2([
-      { id: "oldest", createdAt: "2026-06-01T08:00:00.000Z" },
-      { id: "newest", createdAt: "2026-06-01T12:00:00.000Z" },
-      { id: "middle", createdAt: "2026-06-01T10:00:00.000Z" },
+      {
+        id: "quiet-newer",
+        createdAt: "2026-06-01T12:00:00.000Z",
+        updatedAt: "2026-06-01T12:00:00.000Z",
+        latestUserMessageAt: "2026-06-01T12:00:00.000Z",
+      },
+      {
+        id: "active-older",
+        createdAt: "2026-06-01T08:00:00.000Z",
+        updatedAt: "2026-06-01T13:00:00.000Z",
+        latestUserMessageAt: "2026-06-01T13:00:00.000Z",
+      },
+      {
+        id: "middle",
+        createdAt: "2026-06-01T10:00:00.000Z",
+        updatedAt: "2026-06-01T11:00:00.000Z",
+        latestUserMessageAt: "2026-06-01T11:00:00.000Z",
+      },
     ]);
+    expect(sorted.map((thread) => thread.id)).toEqual(["active-older", "quiet-newer", "middle"]);
+  });
+
+  it("orders by creation time when sort is created_at", () => {
+    const sorted = sortThreadsForListV2(
+      [
+        { id: "oldest", createdAt: "2026-06-01T08:00:00.000Z" },
+        { id: "newest", createdAt: "2026-06-01T12:00:00.000Z" },
+        { id: "middle", createdAt: "2026-06-01T10:00:00.000Z" },
+      ],
+      "created_at",
+    );
     expect(sorted.map((thread) => thread.id)).toEqual(["newest", "middle", "oldest"]);
   });
 
@@ -730,14 +757,41 @@ describe("buildThreadListV2Items", () => {
     expect(layout.settledShelfHeaderIndex).toBe(0);
   });
 
-  it("keeps cards in creation order while settled sorts by recency", () => {
+  it("orders active cards by last activity by default", () => {
     const { items } = buildThreadListV2Items({
       threads: [
         makeThread({
           id: ThreadId.make("older-created"),
           title: "Older",
           createdAt: "2026-06-01T08:00:00.000Z",
-          updatedAt: NOW, // recent activity must NOT promote it
+          updatedAt: NOW,
+          latestUserMessageAt: NOW,
+        }),
+        makeThread({
+          id: ThreadId.make("newer-created"),
+          title: "Newer",
+          createdAt: "2026-06-01T12:00:00.000Z",
+          updatedAt: "2026-06-01T12:00:00.000Z",
+          latestUserMessageAt: "2026-06-01T12:00:00.000Z",
+        }),
+      ],
+      environmentId: null,
+      searchQuery: "",
+      now: NOW,
+    });
+
+    expect(items.map((item) => item.thread.id)).toEqual(["older-created", "newer-created"]);
+  });
+
+  it("keeps cards in creation order when sort is created_at", () => {
+    const { items } = buildThreadListV2Items({
+      threads: [
+        makeThread({
+          id: ThreadId.make("older-created"),
+          title: "Older",
+          createdAt: "2026-06-01T08:00:00.000Z",
+          updatedAt: NOW,
+          latestUserMessageAt: NOW,
         }),
         makeThread({
           id: ThreadId.make("newer-created"),
@@ -747,6 +801,7 @@ describe("buildThreadListV2Items", () => {
       ],
       environmentId: null,
       searchQuery: "",
+      threadSortOrder: "created_at",
       now: NOW,
     });
 

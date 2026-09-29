@@ -315,6 +315,52 @@ describe("sortActiveThreadsByOrderKey", () => {
     ]);
   });
 
+  it("orders keyless threads by latest user message when sort is updated_at", () => {
+    const sorted = sortActiveThreadsByOrderKey(
+      [
+        {
+          id: "quiet-newer",
+          createdAt: "2026-03-09T12:00:00.000Z",
+          updatedAt: "2026-03-09T12:00:00.000Z",
+          latestUserMessageAt: "2026-03-09T12:00:00.000Z",
+        },
+        {
+          id: "active-older",
+          createdAt: "2026-03-09T08:00:00.000Z",
+          updatedAt: "2026-03-09T13:00:00.000Z",
+          latestUserMessageAt: "2026-03-09T13:00:00.000Z",
+        },
+        {
+          id: "middle",
+          createdAt: "2026-03-09T10:00:00.000Z",
+          updatedAt: "2026-03-09T11:00:00.000Z",
+          latestUserMessageAt: "2026-03-09T11:00:00.000Z",
+        },
+      ],
+      "updated_at",
+    );
+    expect(sorted.map((thread) => thread.id)).toEqual(["active-older", "quiet-newer", "middle"]);
+  });
+
+  it("keeps creation/re-entry order when sort is created_at", () => {
+    const sorted = sortActiveThreadsByOrderKey(
+      [
+        {
+          id: "active-older",
+          createdAt: "2026-03-09T08:00:00.000Z",
+          latestUserMessageAt: "2026-03-09T13:00:00.000Z",
+        },
+        {
+          id: "quiet-newer",
+          createdAt: "2026-03-09T12:00:00.000Z",
+          latestUserMessageAt: "2026-03-09T12:00:00.000Z",
+        },
+      ],
+      "created_at",
+    );
+    expect(sorted.map((thread) => thread.id)).toEqual(["quiet-newer", "active-older"]);
+  });
+
   it("breaks equal order keys and timestamps by thread then environment", () => {
     for (const activeOrderKey of [null, "m"]) {
       const threads = [

@@ -1,24 +1,23 @@
 ---
 name: merge-upstream
 description: >-
-  Selectively merge the latest stable upstream release into this fork. Use when
-  the user says merge upstream, sync upstream, triage upstream, pull upstream
-  release, or catch up with a shipped upstream version — never tip-of-main.
+  Selectively merge the latest stable upstream release into detroitpro/t3code.
+  Use when the user says merge upstream, sync upstream, triage upstream, pull
+  upstream release, or catch up with a shipped upstream version — never tip-of-main.
 disable-model-invocation: true
 ---
 
 # Merge upstream
 
 Bring commits from the **latest stable upstream release** into `detroitpro/t3code`,
-triaged one by one. Prefer keeping fork changes. Never contribute anything back
-to the source repo.
+triaged one by one. Prefer keeping local/personal changes. Never contribute
+anything back to the source repo via its GitHub UI/API.
 
 ## Hard guardrails
 
-- **No permanent `upstream` remote.** A named remote pointing at the other GitHub
-  copy makes `gh pr create` open PRs there by default. Fetch with a **one-shot
-  URL** only (below). Never `git remote add upstream`, never `git push` to that
-  URL, never open issues/PRs/discussions on that GitHub copy, never comment there.
+- **No permanent `upstream` remote.** Fetch with a **one-shot URL** only
+  (below). Never `git remote add upstream`, never `git push` to that URL, never
+  open issues/PRs/discussions on that GitHub copy, never comment there.
 - All GitHub work (`gh`, issues, PRs) targets **`detroitpro/t3code`** / `origin`.
   Pass `--repo detroitpro/t3code` on every `gh` call that needs a repo.
 - Sync target is the latest **stable** tag only: `vX.Y.Z` with no suffix.
@@ -26,19 +25,20 @@ to the source repo.
   unless the user explicitly overrides for this run.
 - Do **not** run a blind tip-of-main merge or `make sync` (that target is
   disabled).
-- Default **keep the fork** on conflicts. Drop or skip the upstream hunk when it
-  fights a deliberate fork change; record the skip rather than inventing a blend.
+- Default **keep local intent** on conflicts. Drop or skip the upstream hunk
+  when it fights a deliberate personal change; record the skip rather than
+  inventing a blend.
 
 ## Scope posture
 
-This fork’s own commits are almost all **web UI**. That does **not** mean skip
+This repo’s own commits are almost all **web UI**. That does **not** mean skip
 other areas: if the release changes mobile, background, connect/relay, or
-anything else, **prefer take**. We simply avoid _authoring_ fork-only work in
-those areas.
+anything else, **prefer take**. We simply avoid _authoring_ personal-only work
+in those areas.
 
-When triaging, flag path overlap with deliberate fork web-UI changes — those are
-where “keep the fork” conflicts are most likely. Skip only when the user decides
-the upstream change fights fork intent (or is otherwise unwanted).
+When triaging, flag path overlap with deliberate web-UI changes — those are
+where “keep local” conflicts are most likely. Skip only when the user decides
+the upstream change fights local intent (or is otherwise unwanted).
 
 ## Resolve the release
 
@@ -89,7 +89,7 @@ or the user defers.
    remove it (`git remote remove <name>`) before continuing, then
    `gh repo set-default detroitpro/t3code`.
 2. **Resolve `T`** per above. Stop if already an ancestor of `origin/main`.
-3. **Candidate list** — commits in the release that this fork lacks:
+3. **Candidate list** — commits in the release that this repo lacks:
 
    ```bash
    git log --oneline --reverse origin/main.."$T"
@@ -99,14 +99,14 @@ or the user defers.
    into a single triage unit; list every SHA in the unit. Prefer oldest-first
    (cherry-pick order).
 
-4. **Prior skips.** Search this fork’s issues
+4. **Prior skips.** Search this repo’s issues
    (`gh issue list -R detroitpro/t3code --state all --search "upstream sync"`)
    and treat previously skipped SHAs/PRs as already decided unless the user
    reopens them.
 5. **Triage one by one.** For each unit, show: subject / PR, paths touched,
-   whether it overlaps fork web-UI changes, and a recommendation
+   whether it overlaps local web-UI changes, and a recommendation
    (`take` / `skip` / `ask`). Default is `take` unless it clearly fights known
-   fork intent. Wait for the user’s call before moving on. Do not auto-accept a
+   local intent. Wait for the user’s call before moving on. Do not auto-accept a
    long batch.
 6. **Open one plan issue** on `detroitpro/t3code` with the template below. Title
    like `chore: upstream sync <tag>`. Stop after the issue exists and the user
@@ -120,8 +120,8 @@ For the chosen `take` item only:
 2. Cherry-pick the SHA(s) (or an equivalent minimal apply). No full merge of
    tip-of-main. Merging tag `T` in one shot is only OK if the user asks for
    that instead of per-item cherry-picks.
-3. On conflict: keep fork intent; use `resolving-merge-conflicts` with that bias.
-   If the upstream change cannot land without wrecking deliberate fork behavior,
+3. On conflict: keep local intent; use `resolving-merge-conflicts` with that bias.
+   If the upstream change cannot land without wrecking deliberate local behavior,
    **skip**, record the reason on the plan issue, and abort the branch.
 4. Verify narrowly (targeted tests / typecheck for touched paths). No repo-wide
    suite unless asked.
@@ -146,7 +146,7 @@ For the chosen `take` item only:
 
 - Stable release only — not tip-of-main / nightly / preview.
 - Prefer take for all areas (including mobile, background, connect).
-- Keep deliberate fork (mostly web UI) changes on conflict; never push or open
+- Keep deliberate local (mostly web UI) changes on conflict; never push or open
   GitHub work on the source copy; never keep a permanent upstream remote.
 
 ### Candidates

@@ -96,7 +96,7 @@ Building from source? Start at [docs/internals/overview.md](./docs/internals/ove
 
 ### Install dependencies (repo-local `vp`)
 
-This fork does **not** use a global Vite+ install. Dependencies (and `node_modules/.bin/vp`) come from pnpm:
+This checkout does **not** use a global Vite+ install. Dependencies (and `node_modules/.bin/vp`) come from pnpm:
 
 ```bash
 make deps          # preferred — also activates pnpm via corepack if needed

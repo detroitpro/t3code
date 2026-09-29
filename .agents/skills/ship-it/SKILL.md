@@ -48,10 +48,14 @@ already on it), then continue from "Finish the work".
    commit when shipping requires it; do not commit secrets.
 2. **Push** the branch with `-u` when new. Never force-push unless the user
    explicitly requests it.
-3. **Open or update the PR** with `gh pr create` / `gh pr edit`:
+3. **Open or update the PR** with
+   `gh pr create --repo detroitpro/t3code` / `gh pr edit --repo detroitpro/t3code`
+   (always pass `--repo`; a stray `upstream` remote would otherwise open the PR
+   on the wrong GitHub copy):
    - Title matches commit style and describes the user-visible outcome.
    - Body: problem in 1–2 sentences, then how it was fixed; include a short
      test plan. Link the issue with `Fixes #N` / `Closes #N` when applicable.
+   - Confirm the returned URL is under `detroitpro/t3code` before linking it.
 4. If this environment tracks thread PRs (for example T3 Code
    `link_pull_request`), register the PR URL immediately after create or when
    you start work on an existing PR.

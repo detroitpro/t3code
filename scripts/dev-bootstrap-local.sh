@@ -10,7 +10,7 @@
 # Vite+ stays repo-local (node_modules/.bin/vp via pnpm). Do not curl-install
 # global Vite+ — it shims yarn/npm and breaks other checkouts.
 #
-# Does not open PRs against upstream. Does not touch ~/.t3/userdata.
+# Does not open PRs against other GitHub copies. Does not touch ~/.t3/userdata.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -170,6 +170,27 @@ else
   status warn "node_modules missing — run: make deps"
 fi
 
+# --- git remotes / gh default ---------------------------------------------
+# A named "upstream" remote makes `gh pr create` open PRs on the wrong repo.
+if git -C "$ROOT" remote get-url upstream >/dev/null 2>&1; then
+  status fail "git remote 'upstream' present — remove it (see FORK.md); it hijacks gh pr create"
+elif git -C "$ROOT" remote | grep -qx origin; then
+  status ok "no permanent upstream remote"
+else
+  status warn "origin remote missing"
+fi
+if have_cmd gh; then
+  resolved="$(git -C "$ROOT" config --get remote.origin.gh-resolved 2>/dev/null || true)"
+  if [[ "$resolved" == "base" ]]; then
+    status ok "gh default pinned to origin (gh-resolved=base)"
+  else
+    status warn "run: gh repo set-default detroitpro/t3code"
+  fi
+  unset resolved
+else
+  status warn "gh not on PATH — install GitHub CLI for PRs on detroitpro/t3code"
+fi
+
 printf '\nSummary: %s ok, %s warn, %s fail\n' "$ok" "$warn" "$fail"
 
 if [[ "$CHECK_ONLY" -eq 1 ]]; then
@@ -183,6 +204,7 @@ Next steps
 ----------
   cd $ROOT
   make deps                           # pnpm install → node_modules/.bin/vp
+  gh repo set-default detroitpro/t3code   # once per clone; keeps gh on this fork
   make dev                            # pair via the printed pairing URL
   # worktree state: $ROOT/.t3  (never use live ~/.t3/userdata for dev)
 
@@ -191,6 +213,7 @@ Build + install a clickable local AppImage (taskbar):
   # or: ./scripts/install-local-appimage.sh --help
 
 Do not install global Vite+ (curl https://vite.plus | bash) on this machine.
+Do not add a permanent git remote named upstream (hijacks gh pr create).
 
 See FORK.md for the fork-only workflow (GitHub work on detroitpro/t3code only).
 EOF

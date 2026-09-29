@@ -11,17 +11,21 @@ disable-model-invocation: true
 
 Bring commits from the **latest stable upstream release** into `detroitpro/t3code`,
 triaged one by one. Prefer keeping fork changes. Never contribute anything back
-to upstream.
+to the source repo.
 
 ## Hard guardrails
 
-- **Fetch only** from the `upstream` git remote. Never `git push upstream`, never
-  open issues/PRs/discussions on `pingdotgg/t3code`, never comment there.
+- **No permanent `upstream` remote.** A named remote pointing at the other GitHub
+  copy makes `gh pr create` open PRs there by default. Fetch with a **one-shot
+  URL** only (below). Never `git remote add upstream`, never `git push` to that
+  URL, never open issues/PRs/discussions on that GitHub copy, never comment there.
 - All GitHub work (`gh`, issues, PRs) targets **`detroitpro/t3code`** / `origin`.
+  Pass `--repo detroitpro/t3code` on every `gh` call that needs a repo.
 - Sync target is the latest **stable** tag only: `vX.Y.Z` with no suffix.
-  **Refuse** `upstream/main`, `*-nightly.*`, `*-preview.*`, `*-rc*`, and drafts
+  **Refuse** tip-of-main, `*-nightly.*`, `*-preview.*`, `*-rc*`, and drafts
   unless the user explicitly overrides for this run.
-- Do **not** run a blind `git merge upstream/main` or `make sync` in this skill.
+- Do **not** run a blind tip-of-main merge or `make sync` (that target is
+  disabled).
 - Default **keep the fork** on conflicts. Drop or skip the upstream hunk when it
   fights a deliberate fork change; record the skip rather than inventing a blend.
 
@@ -38,26 +42,39 @@ the upstream change fights fork intent (or is otherwise unwanted).
 
 ## Resolve the release
 
-1. `git fetch upstream --tags` (and `git fetch origin` if needed). No push.
-2. List stable tags from the upstream remote (not local-only leftovers):
+Use a one-shot fetch URL (git only — not `gh` against that host):
+
+```bash
+SOURCE_URL="$(git config --get fork.sourceUrl 2>/dev/null || true)"
+SOURCE_URL="${SOURCE_URL:-https://github.com/pingdotgg/t3code.git}"
+```
+
+`fork.sourceUrl` is optional local config so the literal default stays out of
+muscle memory; the fallback is the public source clone URL for tag fetch only.
+
+1. `git fetch origin` if needed. No push to `SOURCE_URL`.
+2. List stable tags from the source URL (not local-only leftovers):
 
    ```bash
-   git ls-remote --refs --tags upstream \
+   git ls-remote --refs --tags "$SOURCE_URL" \
      | awk '{print $2}' | sed 's|refs/tags/||' \
      | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
      | sort -V
    ```
 
    Latest line = target tag `T`. Fetch it if missing locally:
-   `git fetch upstream tag "$T" --no-tags`.
+
+   ```bash
+   git fetch "$SOURCE_URL" "refs/tags/$T:refs/tags/$T" --no-tags
+   ```
 
 3. Optional previous stable `T_prev`: the line before `T` in that sorted list
    (useful for release notes / grouping). Not required for the candidate range.
 4. If `git merge-base --is-ancestor "$T" origin/main`, report **already includes
    `T`** and stop. No plan issue unless the user wants one for the record.
 
-Do **not** resolve the target via `gh` against pingdotgg. Git tags on `upstream`
-are enough.
+Do **not** resolve the target via `gh` against the source GitHub copy. Tags via
+`git ls-remote` / `git fetch` are enough.
 
 ## Process
 
@@ -67,9 +84,10 @@ or the user defers.
 
 ### Phase 1 — Plan (single GitHub issue)
 
-1. **Remotes.** Confirm `origin` → `detroitpro/t3code` and `upstream` is the
-   pingdotgg git remote (fetch URL only matters). If `upstream` is missing, stop
-   and ask; do not guess a URL beyond what `git remote -v` already shows.
+1. **Remotes.** Confirm `origin` → `detroitpro/t3code` and that **no** permanent
+   remote points at the source GitHub copy (`git remote -v`). If one exists,
+   remove it (`git remote remove <name>`) before continuing, then
+   `gh repo set-default detroitpro/t3code`.
 2. **Resolve `T`** per above. Stop if already an ancestor of `origin/main`.
 3. **Candidate list** — commits in the release that this fork lacks:
 
@@ -100,15 +118,17 @@ For the chosen `take` item only:
 
 1. Branch from up-to-date `origin/main`.
 2. Cherry-pick the SHA(s) (or an equivalent minimal apply). No full merge of
-   `upstream/main`. Merging tag `T` in one shot is only OK if the user asks for
+   tip-of-main. Merging tag `T` in one shot is only OK if the user asks for
    that instead of per-item cherry-picks.
 3. On conflict: keep fork intent; use `resolving-merge-conflicts` with that bias.
    If the upstream change cannot land without wrecking deliberate fork behavior,
    **skip**, record the reason on the plan issue, and abort the branch.
 4. Verify narrowly (targeted tests / typecheck for touched paths). No repo-wide
    suite unless asked.
-5. Land a PR to `detroitpro/t3code` (conventional title). Link the plan issue.
-   Register the PR with the thread (`link_pull_request`) when that tool exists.
+5. Land a PR to `detroitpro/t3code` with
+   `gh pr create --repo detroitpro/t3code` (conventional title). Link the plan
+   issue. Register the PR with the thread (`link_pull_request`) when that tool
+   exists.
 6. Update the plan issue checklist (`take` → done with PR link, or → skipped).
 7. Stop and ask which item is next.
 
@@ -127,7 +147,7 @@ For the chosen `take` item only:
 - Stable release only — not tip-of-main / nightly / preview.
 - Prefer take for all areas (including mobile, background, connect).
 - Keep deliberate fork (mostly web UI) changes on conflict; never push or open
-  GitHub work on upstream.
+  GitHub work on the source copy; never keep a permanent upstream remote.
 
 ### Candidates
 
@@ -149,5 +169,6 @@ For the chosen `take` item only:
 - `origin/main` already contained `T`, or a plan issue exists for this campaign, and
 - Every `take` the user wanted landed as its own PR (or was reclassified), and
 - Every `skip` has a written reason on that issue, and
-- Nothing was pushed to `upstream`, no GitHub API was used against pingdotgg, and
-  tip-of-main / nightly / preview were not merged unless explicitly overridden.
+- No permanent upstream remote exists, no GitHub API was used against the source
+  copy, and tip-of-main / nightly / preview were not merged unless explicitly
+  overridden.

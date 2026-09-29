@@ -114,7 +114,7 @@ help menu:
 	@printf '  $(C_BOLD)$(C_WHITE)Build / sync$(C_RESET)\n'
 	$(RULE)
 	@printf '  $(C_GREEN)$(C_BOLD)dist$(C_RESET)$(C_GREEN), appimage$(C_RESET)    Build Linux AppImage only → $(C_DIM)release/$(C_RESET)\n'
-	@printf '  $(C_CYAN)$(C_BOLD)sync$(C_RESET)               Fetch + merge $(C_DIM)upstream/main$(C_RESET) into this branch\n'
+	@printf '  $(C_CYAN)$(C_BOLD)sync$(C_RESET)               Refused — use $(C_DIM)merge-upstream$(C_RESET) skill (stable cherry-picks)\n'
 	@printf '  $(C_RED)$(C_BOLD)clean$(C_RESET)              Remove node_modules / dist caches\n'
 	@printf '\n'
 	@printf '  $(C_DIM)Checkout: %s$(C_RESET)\n' "$(GIT_REF)"
@@ -250,17 +250,15 @@ appimage:
 
 sync: sync-upstream
 
+# Disabled: a permanent "upstream" remote makes `gh pr create` target the wrong
+# GitHub copy. Catch up via the merge-upstream skill (one-shot fetch + cherry-pick).
 sync-upstream:
 	$(BANNER)
-	$(call STEP,$(C_CYAN),sync,fetch upstream + merge upstream/main)
-	@git -C "$(ROOT)" remote get-url upstream >/dev/null 2>&1 || { \
-		printf '  $(C_RED)no upstream remote$(C_RESET) — configure git remote upstream for sync (see FORK.md)\n'; \
-		exit 1; \
-	}
-	@git -C "$(ROOT)" fetch upstream
-	@git -C "$(ROOT)" merge upstream/main
-	@printf '  $(C_GREEN)$(C_BOLD)✓ synced from upstream/main$(C_RESET)\n'
-	@printf '  $(C_DIM)Push when ready: git push origin HEAD$(C_RESET)\n\n'
+	$(call STEP,$(C_CYAN),sync,refused — no permanent upstream remote)
+	@printf '  $(C_RED)$(C_BOLD)make sync is disabled$(C_RESET)\n'
+	@printf '  Prefer the $(C_BOLD)merge-upstream$(C_RESET) skill: stable $(C_DIM)vX.Y.Z$(C_RESET) tag → triage → cherry-pick.\n'
+	@printf '  See $(C_DIM)FORK.md$(C_RESET). Do not add a lasting git remote named upstream.\n\n'
+	@exit 1
 
 clean:
 	$(BANNER)

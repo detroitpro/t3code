@@ -14,7 +14,8 @@ import {
   resolveSettledThreadTimestamp,
   sortPinnedThreadsByOrderKey,
 } from "@t3tools/client-runtime/state/thread-sort";
-import type { EnvironmentId, ProjectId } from "@t3tools/contracts";
+import type { EnvironmentId, ProjectId, SidebarThreadSortOrder } from "@t3tools/contracts";
+import { DEFAULT_SIDEBAR_THREAD_SORT_ORDER } from "@t3tools/contracts";
 
 import type { PendingNewTask } from "../../state/use-pending-new-tasks";
 
@@ -157,18 +158,23 @@ function parseTimestampMs(isoDate: string): number {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-/** The active order shared by web and native: new/reopened rows, then the
-    saved arrangement. Activity does not move a thread. */
+/** The active order shared by web and native: keyless rows by `sortOrder`
+    (default last user activity), then the saved arrangement. */
 export function sortThreadsForListV2<
   T extends {
     readonly id: string;
     readonly createdAt: string;
+    readonly updatedAt?: string;
+    readonly latestUserMessageAt?: string | null | undefined;
     readonly unsettledAt?: string | null | undefined;
     readonly activeOrderKey?: string | null | undefined;
     readonly environmentId?: string | undefined;
   },
->(threads: readonly T[]): T[] {
-  return sortActiveThreadsByOrderKey(threads);
+>(
+  threads: readonly T[],
+  sortOrder: SidebarThreadSortOrder = DEFAULT_SIDEBAR_THREAD_SORT_ORDER,
+): T[] {
+  return sortActiveThreadsByOrderKey(threads, sortOrder);
 }
 
 /** Canonical card section for Move up/down, independent of search or scope. */
@@ -177,6 +183,7 @@ export function getThreadListV2OrderedSection(input: {
   readonly section: "pinned" | "active";
   readonly pendingOrder?: PendingThreadOrder | null;
   readonly now: string;
+  readonly threadSortOrder?: SidebarThreadSortOrder;
   readonly settlementEnvironmentIds?: ReadonlySet<EnvironmentId>;
   readonly snoozeEnvironmentIds?: ReadonlySet<EnvironmentId>;
   readonly queuedThreadKeys?: ReadonlySet<string>;
@@ -198,10 +205,11 @@ export function getThreadListV2OrderedSection(input: {
     }
     return (thread.pinnedAt != null) === (input.section === "pinned");
   });
+  const sortOrder = input.threadSortOrder ?? DEFAULT_SIDEBAR_THREAD_SORT_ORDER;
   const ordered =
     input.section === "pinned"
       ? sortPinnedThreadsByOrderKey(threads)
-      : sortActiveThreadsByOrderKey(threads);
+      : sortActiveThreadsByOrderKey(threads, sortOrder);
   const pending =
     input.pendingOrder?.section === input.section
       ? reconcilePendingThreadOrder(input.pendingOrder, ordered)
@@ -356,6 +364,8 @@ export function buildThreadListV2Items(input: {
   readonly snoozeEnvironmentIds?: ReadonlySet<EnvironmentId>;
   /** Max settled rows to render; the rest are counted, not built. */
   readonly settledLimit?: number;
+  /** Active keyless sort; defaults to last user message. */
+  readonly threadSortOrder?: SidebarThreadSortOrder;
   /** Second-precise clock used for time-based classification. */
   readonly now: string;
   /** Expands the snoozed shelf into rows. Collapsed is the default. */
@@ -438,7 +448,11 @@ export function buildThreadListV2Items(input: {
     }
   }
 
-  const orderedActive = applyPendingThreadOrder(sortThreadsForListV2(active), "active", pending);
+  const orderedActive = applyPendingThreadOrder(
+    sortThreadsForListV2(active, input.threadSortOrder ?? DEFAULT_SIDEBAR_THREAD_SORT_ORDER),
+    "active",
+    pending,
+  );
   const orderedSnoozed = [...snoozed].sort(
     (left, right) =>
       parseTimestampMs(left.snoozedUntil ?? "") - parseTimestampMs(right.snoozedUntil ?? ""),

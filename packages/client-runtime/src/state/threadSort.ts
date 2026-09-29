@@ -1,5 +1,9 @@
 import type { OrchestrationThreadShell, ProjectId } from "@t3tools/contracts";
-import type { SidebarProjectSortOrder, SidebarThreadSortOrder } from "@t3tools/contracts/settings";
+import {
+  DEFAULT_SIDEBAR_THREAD_SORT_ORDER,
+  type SidebarProjectSortOrder,
+  type SidebarThreadSortOrder,
+} from "@t3tools/contracts/settings";
 
 export interface ThreadSortInput {
   readonly createdAt: string;
@@ -98,12 +102,10 @@ export function getThreadSortTimestamp(
 }
 
 /**
- * Sort anchor for the active thread list: creation time, re-anchored to
+ * Sort anchor for `created_at` active ordering: creation time, re-anchored to
  * unsettledAt when the thread last re-entered the active list (an explicit
- * un-settle, or a settled thread waking on activity). The list stays static
- * between lifecycle transitions, but an un-settled thread surfaces at the
- * top instead of sinking back to its creation-order slot. Shared by web and
- * mobile so both render the same order. Malformed timestamps sink to 0.
+ * un-settle, or a settled thread waking on activity). Malformed timestamps
+ * sink to 0.
  */
 function activeThreadAnchorTimestampMs(thread: {
   readonly createdAt: string;
@@ -113,6 +115,40 @@ function activeThreadAnchorTimestampMs(thread: {
     toSortableTimestamp(thread.createdAt) ?? 0,
     toSortableTimestamp(thread.unsettledAt ?? undefined) ?? 0,
   );
+}
+
+type ActiveThreadSortFields = {
+  readonly createdAt: string;
+  readonly updatedAt?: string;
+  readonly latestUserMessageAt?: string | null | undefined;
+  readonly messages?: ThreadSortInput["messages"];
+  readonly unsettledAt?: string | null | undefined;
+};
+
+/** Keyless active-row timestamp for the requested sort. `updated_at` follows
+    latest user activity (and unsettledAt so a reopen still surfaces);
+    `created_at` keeps the static creation/re-entry anchor. */
+function activeThreadSortTimestampMs(
+  thread: ActiveThreadSortFields,
+  sortOrder: SidebarThreadSortOrder,
+): number {
+  if (sortOrder === "created_at") {
+    return activeThreadAnchorTimestampMs(thread);
+  }
+  const activity = getThreadSortTimestamp(
+    {
+      createdAt: thread.createdAt,
+      updatedAt: thread.updatedAt ?? thread.createdAt,
+      ...(thread.latestUserMessageAt !== undefined
+        ? { latestUserMessageAt: thread.latestUserMessageAt }
+        : {}),
+      ...(thread.messages !== undefined ? { messages: thread.messages } : {}),
+    },
+    "updated_at",
+  );
+  const unsettled =
+    toSortableTimestamp(thread.unsettledAt ?? undefined) ?? Number.NEGATIVE_INFINITY;
+  return Math.max(activity, unsettled);
 }
 
 export function sortThreads<T extends { readonly id: string } & ThreadSortInput>(
@@ -317,22 +353,29 @@ export function sortPinnedThreadsByOrderKey<
   return [...keyed, ...keyless];
 }
 
-/** New and reopened threads lead the active list. Arranged threads follow
-    their saved keys; activity leaves both groups in place. */
+/** Keyless threads lead the active list (by `sortOrder`, default last user
+    activity); arranged threads follow their saved keys and stay put when
+    activity changes. Shared by web and mobile. */
 export function sortActiveThreadsByOrderKey<
   T extends {
     readonly id: string;
     readonly createdAt: string;
+    readonly updatedAt?: string;
+    readonly latestUserMessageAt?: string | null | undefined;
+    readonly messages?: ThreadSortInput["messages"];
     readonly unsettledAt?: string | null | undefined;
     readonly activeOrderKey?: string | null | undefined;
     readonly environmentId?: string | undefined;
   },
->(threads: readonly T[]): T[] {
+>(
+  threads: readonly T[],
+  sortOrder: SidebarThreadSortOrder = DEFAULT_SIDEBAR_THREAD_SORT_ORDER,
+): T[] {
   if (threads.length < 2) return [...threads];
   const timestamps = new Map<T, number>();
   for (const thread of threads) {
     if (thread.activeOrderKey == null) {
-      timestamps.set(thread, activeThreadAnchorTimestampMs(thread));
+      timestamps.set(thread, activeThreadSortTimestampMs(thread, sortOrder));
     }
   }
   return [...threads].sort((left, right) => {

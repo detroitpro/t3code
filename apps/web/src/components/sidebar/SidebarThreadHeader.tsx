@@ -32,6 +32,8 @@ export interface SidebarThreadHeaderProps {
   hasProjects: boolean;
   /** The project scope combobox, rendered as the first icon of the group. */
   projectScope: ReactNode;
+  /** Sort options for projects and threads (ArrowUpDown menu). */
+  sortMenu?: ReactNode;
   onNewProject: () => void;
   /** Receives the click so Shift+click can skip the project picker. */
   onNewThread: (event: ReactMouseEvent) => void;
@@ -54,6 +56,7 @@ export function SidebarThreadHeader({
   searchFieldRef,
   hasProjects,
   projectScope,
+  sortMenu,
   onNewProject,
   onNewThread,
   newThreadDisabled,
@@ -126,6 +129,7 @@ export function SidebarThreadHeader({
           hover states, and a background well reads far louder on themed
           palettes than on the base light and dark ones. */}
       <div className="flex shrink-0 items-center">
+        {sortMenu}
         {hasProjects ? (
           <>
             {projectScope}

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fork-local workstation bootstrap for detroitpro/t3code.
+# Workstation bootstrap for detroitpro/t3code (standalone personal repo).
 # Checks (and optionally installs) tooling needed for repo-local `vp` and
 # `make dist` / AppImage builds on Ubuntu/Debian x86_64.
 #
@@ -67,7 +67,7 @@ apt_installed() {
   dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q 'install ok installed'
 }
 
-printf 'T3 Code local bootstrap (fork)\n'
+printf 'T3 Code local bootstrap (detroitpro/t3code)\n'
 printf 'repo: %s\n\n' "$ROOT"
 
 # --- Node -----------------------------------------------------------------
@@ -204,7 +204,7 @@ Next steps
 ----------
   cd $ROOT
   make deps                           # pnpm install → node_modules/.bin/vp
-  gh repo set-default detroitpro/t3code   # once per clone; keeps gh on this fork
+  gh repo set-default detroitpro/t3code   # once per clone; keeps gh on this repo
   make dev                            # pair via the printed pairing URL
   # worktree state: $ROOT/.t3  (never use live ~/.t3/userdata for dev)
 
@@ -213,9 +213,9 @@ Build + install a clickable local AppImage (taskbar):
   # or: ./scripts/install-local-appimage.sh --help
 
 Do not install global Vite+ (curl https://vite.plus | bash) on this machine.
-Do not add a permanent git remote named upstream (hijacks gh pr create).
+Do not add a permanent git remote named upstream (can hijack gh pr create).
 
-See FORK.md for the fork-only workflow (GitHub work on detroitpro/t3code only).
+See FORK.md (GitHub work on detroitpro/t3code only; one-shot upstream fetch).
 EOF
 
 [[ "$fail" -eq 0 ]] || exit 1

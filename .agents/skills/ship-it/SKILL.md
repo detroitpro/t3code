@@ -38,8 +38,8 @@ already on it), then continue from "Finish the work".
   typecheck, or lint for what you touched). Do not run the full suite unless
   the user asks or the repo requires it for this path.
 - Follow repo agent rules when present (`AGENTS.md`, `CONTRIBUTING.md`,
-  fork/remote constraints). For this repository, GitHub work targets
-  `detroitpro/t3code` only.
+  GitHub/remote constraints in `FORK.md` / `fork-github.mdc`). For this
+  repository, GitHub work targets `detroitpro/t3code` only.
 
 ## Land the PR
 

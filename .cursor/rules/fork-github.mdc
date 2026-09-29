@@ -1,11 +1,12 @@
 ---
-description: Fork-only GitHub — never target pingdotgg/t3code
+description: detroitpro/t3code only — never target pingdotgg/t3code on GitHub
 alwaysApply: true
 ---
 
-# Fork GitHub boundary
+# GitHub boundary (`detroitpro/t3code`)
 
-This checkout is the **detroitpro/t3code** fork. Personal work is tracked here only.
+This checkout’s canonical GitHub repo is **detroitpro/t3code** (standalone
+personal copy). All GitHub product work happens there only.
 
 ## Hard rule
 
@@ -19,11 +20,11 @@ This checkout is the **detroitpro/t3code** fork. Personal work is tracked here o
 
 **Always** use `https://github.com/detroitpro/t3code` (or `detroitpro/t3code` / `origin`).
 
-## `gh` must not leave the fork
+## Remotes and `gh`
 
 - **Never** add a permanent git remote named `upstream` (or any remote whose URL
-  is the other GitHub copy). A named `upstream` remote makes `gh pr create`
-  open PRs against that repo by default.
+  is another GitHub copy of T3 Code). A named `upstream` remote can make
+  `gh pr create` open PRs against that repo by default while a parent link exists.
 - Every `gh` call that needs a repo must pass **`--repo detroitpro/t3code`**
   (or `-R detroitpro/t3code`). Do not rely on ambient resolution.
 - After clone/bootstrap: `gh repo set-default detroitpro/t3code` so
@@ -32,7 +33,7 @@ This checkout is the **detroitpro/t3code** fork. Personal work is tracked here o
 ## Allowed exception (git fetch only)
 
 When the user asks to sync a **stable release**, fetch tags/commits with a
-**one-shot URL** (no lasting remote), then cherry-pick into this fork. See
+**one-shot URL** (no lasting remote), then cherry-pick into this repo. See
 `merge-upstream` / `FORK.md`. Never push to that URL, and never use its GitHub
 UI/API.
 
@@ -40,4 +41,4 @@ UI/API.
 
 1. Stop.
 2. Retract or redirect to the equivalent `detroitpro/t3code` artifact.
-3. Prefer creating the correct issue/PR/discussion on the fork immediately.
+3. Prefer creating the correct issue/PR/discussion on `detroitpro/t3code` immediately.

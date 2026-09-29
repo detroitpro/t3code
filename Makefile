@@ -1,4 +1,4 @@
-# Fork-local developer CLI (`detroitpro/t3code`).
+# Personal-repo developer CLI (`detroitpro/t3code`).
 # Prefer `make <target>` over remembering script / vp paths.
 #
 # Vite+ (`vp`) is repo-local: node_modules/.bin/vp from `vite-plus` (pnpm).
@@ -50,7 +50,7 @@ define BANNER
 	@printf '$(C_CYAN)$(C_BOLD)\n'
 	@printf '  ██████████ ████████ \n'
 	@printf '    ███       ▄██▀       $(C_WHITE)T3 Code$(C_CYAN)\n'
-	@printf '    ███       ████▄      $(C_DIM)fork makefile$(C_CYAN)\n'
+	@printf '    ███       ████▄      $(C_DIM)personal makefile$(C_CYAN)\n'
 	@printf '    ███    ▄     ███\n'
 	@printf '    ███    ███████▀ \n'
 	@printf '$(C_RESET)\n'
@@ -118,7 +118,7 @@ help menu:
 	@printf '  $(C_RED)$(C_BOLD)clean$(C_RESET)              Remove node_modules / dist caches\n'
 	@printf '\n'
 	@printf '  $(C_DIM)Checkout: %s$(C_RESET)\n' "$(GIT_REF)"
-	@printf '  $(C_DIM)Fork only · see FORK.md · GitHub work on detroitpro/t3code only$(C_RESET)\n\n'
+	@printf '  $(C_DIM)detroitpro/t3code only · see FORK.md$(C_RESET)\n\n'
 
 # -----------------------------------------------------------------------------
 # Install / workstation

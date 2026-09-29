@@ -1,14 +1,18 @@
-# Fork-only notes (`detroitpro/t3code`)
+# Personal repo notes (`detroitpro/t3code`)
 
-This fork tracks personal work that is **not** proposed elsewhere. Never open
-PRs, issues, or discussions against any other GitHub copy of T3 Code. GitHub
-work happens only on [`detroitpro/t3code`](https://github.com/detroitpro/t3code).
+[`detroitpro/t3code`](https://github.com/detroitpro/t3code) is the **canonical** GitHub
+repo for this checkout. It is a **standalone** personal copy (left the GitHub fork
+network). Never open PRs, issues, or discussions against any other GitHub copy of
+T3 Code.
+
+Verify: `gh api repos/detroitpro/t3code --jq .fork` should be `false`. If it is
+still `true`, finish **Settings → Danger Zone → Leave fork network**.
 
 ## Remotes and `gh`
 
 Keep **only** `origin` → `detroitpro/t3code`. Do **not** add a permanent
-`upstream` remote: GitHub CLI treats that remote as the default base and will
-open `gh pr create` against the wrong repo.
+`upstream` remote: when GitHub still treats the repo as a fork, a named
+`upstream` remote makes `gh pr create` open against the wrong base.
 
 ```bash
 gh repo set-default detroitpro/t3code   # once per clone
@@ -20,9 +24,9 @@ gh issue create --repo detroitpro/t3code ...
 ## Catching up with stable releases
 
 Use the **`merge-upstream`** skill: resolve the latest stable `vX.Y.Z` tag via a
-**one-shot** `git fetch` URL (no lasting remote) → triage → one plan issue on
-this fork → cherry-pick take items one by one. Never tip-of-main, nightlies, or
-previews unless you explicitly override.
+**one-shot** `git fetch` URL (no lasting remote) → triage → one plan issue here →
+cherry-pick take items one by one. Never tip-of-main, nightlies, or previews
+unless you explicitly override.
 
 `make sync` is disabled (it used to merge tip-of-main through a permanent
 `upstream` remote). Prefer the skill.
@@ -57,7 +61,7 @@ global Vite+ shims yarn/npm and breaks other projects.
 make bootstrap
 ./scripts/dev-bootstrap-local.sh --fix   # sudo apt-install missing build deps
 make deps                                 # installs pnpm deps + local vp
-gh repo set-default detroitpro/t3code     # pin gh to this fork
+gh repo set-default detroitpro/t3code     # pin gh to this repo
 make dev                                  # use the printed pairing URL
 ```
 
@@ -86,4 +90,5 @@ Defaults:
 - `~/Applications/T3-Code-local.AppImage`
 - `~/.local/share/applications/t3-code-local.desktop` → “T3 Code (Local)”
 
-Related: [#2](https://github.com/detroitpro/t3code/issues/2).
+Related: local AppImage automation (former issue #2; recreate from
+`.local/fork-archive/` if needed after Leave fork network).

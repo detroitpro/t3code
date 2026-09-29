@@ -4,22 +4,28 @@ This fork tracks personal work that is **not** proposed elsewhere. Never open
 PRs, issues, or discussions against any other GitHub copy of T3 Code. GitHub
 work happens only on [`detroitpro/t3code`](https://github.com/detroitpro/t3code).
 
-Keep useful upstream **stable releases** via the **`merge-upstream`** skill
-(latest `vX.Y.Z` tag only → triage → one GitHub plan issue on this fork →
-cherry-pick one by one). Fetch tags from the `upstream` **git** remote — never
-push to it, and never use that remote’s GitHub issues, PRs, or discussions.
-Do not sync tip-of-`upstream/main`, nightlies, or previews unless you mean to.
+## Remotes and `gh`
 
-Blunt full merge of tip-of-main (usually wrong for this fork):
+Keep **only** `origin` → `detroitpro/t3code`. Do **not** add a permanent
+`upstream` remote: GitHub CLI treats that remote as the default base and will
+open `gh pr create` against the wrong repo.
 
 ```bash
-make sync                 # fetch + merge upstream/main into the current branch
-git push origin HEAD      # push to this fork only
+gh repo set-default detroitpro/t3code   # once per clone
+# always prefer an explicit repo flag:
+gh pr create --repo detroitpro/t3code ...
+gh issue create --repo detroitpro/t3code ...
 ```
 
-If `upstream` is missing, add it once with `git remote add upstream <fork-source-url>`
-(the URL already configured on this machine’s remote is fine; agents must not link
-or operate on that GitHub repo beyond git sync when asked).
+## Catching up with stable releases
+
+Use the **`merge-upstream`** skill: resolve the latest stable `vX.Y.Z` tag via a
+**one-shot** `git fetch` URL (no lasting remote) → triage → one plan issue on
+this fork → cherry-pick take items one by one. Never tip-of-main, nightlies, or
+previews unless you explicitly override.
+
+`make sync` is disabled (it used to merge tip-of-main through a permanent
+`upstream` remote). Prefer the skill.
 
 ## Primary human CLI: `make`
 
@@ -35,7 +41,7 @@ make desktop      # Electron + server
 make fmt lint tc  # format / lint / typecheck
 make test ARGS=apps/web/src/rightPanelStore.test.ts
 make dist         # AppImage only → release/
-make sync         # blunt tip-of-main merge (prefer merge-upstream skill / stable)
+make sync         # refused — use merge-upstream skill / stable cherry-picks
 make bootstrap    # check Node / repo-local vp / apt (alias: make b, make doctor)
 make pair         # mint pairing token
 make clean
@@ -51,6 +57,7 @@ global Vite+ shims yarn/npm and breaks other projects.
 make bootstrap
 ./scripts/dev-bootstrap-local.sh --fix   # sudo apt-install missing build deps
 make deps                                 # installs pnpm deps + local vp
+gh repo set-default detroitpro/t3code     # pin gh to this fork
 make dev                                  # use the printed pairing URL
 ```
 

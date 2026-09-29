@@ -14,15 +14,29 @@ This checkout is the **detroitpro/t3code** fork. Personal work is tracked here o
 - `gh` / GitHub API (`-R`, clone URLs for issues/PRs, discussion create/comment)
 - Opening or linking issues, PRs, discussions, or release pages in replies
 - Prefill `issues/new` URLs, Ideas discussions, or triage filing
-- Docs, README, CONTRIBUTING, playbooks, or agent guidance you edit
+- Docs, README, CONTRIBUTING, playbooks, or agent guidance you edit (except the
+  fetch-only sync notes in `FORK.md` / `merge-upstream`)
 
 **Always** use `https://github.com/detroitpro/t3code` (or `detroitpro/t3code` / `origin`).
 
-## Allowed exception
+## `gh` must not leave the fork
 
-`git fetch upstream` / `git merge upstream/main` (or rebase) solely to sync the fork, when the user asked to sync. Do not browse, comment, or create anything on that remote’s GitHub UI/API.
+- **Never** add a permanent git remote named `upstream` (or any remote whose URL
+  is the other GitHub copy). A named `upstream` remote makes `gh pr create`
+  open PRs against that repo by default.
+- Every `gh` call that needs a repo must pass **`--repo detroitpro/t3code`**
+  (or `-R detroitpro/t3code`). Do not rely on ambient resolution.
+- After clone/bootstrap: `gh repo set-default detroitpro/t3code` so
+  `remote.origin.gh-resolved=base` is set locally.
 
-## If you already targeted pingdotgg
+## Allowed exception (git fetch only)
+
+When the user asks to sync a **stable release**, fetch tags/commits with a
+**one-shot URL** (no lasting remote), then cherry-pick into this fork. See
+`merge-upstream` / `FORK.md`. Never push to that URL, and never use its GitHub
+UI/API.
+
+## If you already targeted the wrong GitHub copy
 
 1. Stop.
 2. Retract or redirect to the equivalent `detroitpro/t3code` artifact.

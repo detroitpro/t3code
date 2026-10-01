@@ -1,7 +1,7 @@
 ---
 name: merge-upstream
 description: >-
-  Selectively merge the latest stable upstream release into detroitpro/t3code.
+  Merge the latest stable upstream release tag into detroitpro/t3code.
   Use when the user says merge upstream, sync upstream, triage upstream, pull
   upstream release, or catch up with a shipped upstream version — never tip-of-main.
 disable-model-invocation: true
@@ -10,8 +10,8 @@ disable-model-invocation: true
 # Merge upstream
 
 Bring the **latest stable upstream release** into `detroitpro/t3code`. Prefer
-keeping local/personal changes. Never contribute
-anything back to the source repo via its GitHub UI/API.
+keeping local/personal changes. Never contribute anything back to the source
+repo via its GitHub UI/API.
 
 ## Hard guardrails
 
@@ -110,6 +110,12 @@ merge is mostly clean and the real work is the conflicts.
 7. **Commit** the merge (`chore: merge upstream <T>`; list conflict decisions and
    anything dropped in the body). Ask before pushing or opening a PR; when asked,
    `gh pr create --repo detroitpro/t3code` and `link_pull_request`.
+8. **Land it as a merge commit.** Squash or rebase drops `T` from `main`'s
+   ancestry, so the next sync replays every conflict. The repo disables merge
+   commits by default: ask the user to allow them for this PR
+   (`gh api -X PATCH repos/detroitpro/t3code -f allow_merge_commit=true`, then
+   `gh pr merge --merge`) or to fast-forward `main` to the branch. Afterwards
+   `git merge-base --is-ancestor "$T" origin/main` must succeed.
 
 Use per-item cherry-picks and a triage plan issue only when the user wants to
 leave specific upstream changes out. Then: list `origin/main.."$T"` grouped by

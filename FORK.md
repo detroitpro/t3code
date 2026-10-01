@@ -24,9 +24,9 @@ gh issue create --repo detroitpro/t3code ...
 ## Catching up with stable releases
 
 Use the **`merge-upstream`** skill: resolve the latest stable `vX.Y.Z` tag via a
-**one-shot** `git fetch` URL (no lasting remote) → triage → one plan issue here →
-cherry-pick take items one by one. Never tip-of-main, nightlies, or previews
-unless you explicitly override.
+**one-shot** `git fetch` URL (no lasting remote) → merge that tag on a branch →
+resolve conflicts keeping local intent → typecheck/lint/test. Never tip-of-main,
+nightlies, or previews unless you explicitly override.
 
 `make sync` is disabled (it used to merge tip-of-main through a permanent
 `upstream` remote). Prefer the skill.

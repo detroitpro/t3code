@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import { useLocation } from "@tanstack/react-router";
 import { useEffect } from "react";
 
 import { isElectron } from "../../env";
@@ -20,7 +21,10 @@ import { usePrimaryBarSlotRef } from "./primaryBarSlots";
 function SidebarToggle() {
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const { toggleSidebar } = useSidebar();
-  const shortcutLabel = shortcutLabelForCommand(keybindings, "sidebar.toggle");
+  const usagePageOpen = useLocation({ select: (location) => location.pathname === "/usage" });
+  const shortcutLabel = shortcutLabelForCommand(keybindings, "sidebar.toggle", {
+    context: { usagePageOpen },
+  });
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -40,7 +44,11 @@ function SidebarToggle() {
         // available everywhere else, including the plain-text composer.
         return;
       }
-      if (resolveShortcutCommand(event, keybindings) !== "sidebar.toggle") return;
+      if (
+        resolveShortcutCommand(event, keybindings, { context: { usagePageOpen } }) !==
+        "sidebar.toggle"
+      )
+        return;
 
       event.preventDefault();
       event.stopPropagation();
@@ -56,7 +64,7 @@ function SidebarToggle() {
       window.removeEventListener("keydown", onKeyDown, true);
       unsubscribeAppCommand();
     };
-  }, [keybindings, toggleSidebar]);
+  }, [keybindings, toggleSidebar, usagePageOpen]);
 
   return (
     <Tooltip>
@@ -85,7 +93,7 @@ export function PrimaryBar() {
   return (
     <header
       className={cn(
-        "relative z-30 flex h-[var(--workspace-topbar-height)] min-h-[var(--workspace-topbar-height)] shrink-0 items-center gap-1 border-b border-border bg-background pl-[var(--workspace-controls-left)] pr-[var(--workspace-controls-right)]",
+        "relative z-30 flex h-[var(--workspace-topbar-height)] min-h-[var(--workspace-topbar-height)] shrink-0 items-center gap-1 border-b border-border bg-background pl-(--workspace-controls-left) pr-(--workspace-controls-right)",
         isElectron && "drag-region",
       )}
       data-primary-bar=""

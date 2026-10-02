@@ -19,11 +19,13 @@ import {
   useSettingsRestore,
 } from "./SettingsPanels";
 import { SettingsScopeNotice } from "./SettingsScopeNotice";
+import { SETTINGS_DEVICE_ONLY_PATHS } from "./SettingsScopeSentence";
 import { SettingsScopeProvider, useSettingsScope } from "./SettingsScopeContext";
 import { SettingsSidebarNav } from "./SettingsSidebarNav";
 import { SnapShotSettings } from "./SnapShotSettings";
 import { SourceControlSettingsPanel } from "./SourceControlSettings";
 import { StorageSettingsPanel } from "./StorageSettings";
+import { SettingsPageContainer } from "./settingsLayout";
 import {
   closeSettings,
   type SettingsPlanePath,
@@ -34,14 +36,7 @@ import {
   getThreadAutoSettlementSearchAvailability,
   isSettingsSearchScopeAvailable,
 } from "./settingsSearch";
-import { useSettingsProjectGroups } from "./useSettingsProjectGroups";
 import { useEnvironments } from "../../state/environments";
-
-const DEVICE_ONLY_PATHS = new Set<SettingsPlanePath>([
-  "/settings/appearance",
-  "/settings/snap-shot",
-  "/settings/connections",
-]);
 
 function RestoreDeviceDefaultsButton({ onRestored }: { onRestored: () => void }) {
   const { changedSettingLabels, restoreDefaults } = useSettingsRestore(onRestored);
@@ -102,17 +97,24 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
       </SettingsScopeNotice>
     );
   }
-  if (DEVICE_ONLY_PATHS.has(pathname as SettingsPlanePath) || pathname === "/settings/projects") {
+  if (SETTINGS_DEVICE_ONLY_PATHS.has(pathname) || pathname === "/settings/projects") {
     return children;
   }
+  // Keep the scope sentence on screen so the selection can be changed back.
   if (scope.kind === "unavailable") {
-    return <p className="p-8 text-sm text-muted-foreground">{scope.message}</p>;
+    return (
+      <SettingsPageContainer>
+        <p className="text-sm text-muted-foreground">{scope.message}</p>
+      </SettingsPageContainer>
+    );
   }
   if (scope.kind === "environment" && connectedEnvironments.length === 0) {
     return (
-      <p className="p-8 text-sm text-muted-foreground">
-        Reconnect {scope.label} to change its settings.
-      </p>
+      <SettingsPageContainer>
+        <p className="text-sm text-muted-foreground">
+          Reconnect {scope.label} to change its settings.
+        </p>
+      </SettingsPageContainer>
     );
   }
   return children;
@@ -181,10 +183,7 @@ export function SettingsEditorPlane() {
   const scope = useSettingsPresentationStore((state) => state.scope);
   const setSettingsPath = useSettingsPresentationStore((state) => state.setSettingsPath);
   const setSettingsScope = useSettingsPresentationStore((state) => state.setSettingsScope);
-  const groups = useSettingsProjectGroups();
-  const { environments } = useEnvironments();
   const [restoreSignal, setRestoreSignal] = useState(0);
-  const showScope = !DEVICE_ONLY_PATHS.has(path);
 
   const handleClose = useCallback(() => {
     closeSettings();
@@ -205,25 +204,21 @@ export function SettingsEditorPlane() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handleClose]);
 
-  const locationLikePathname = path;
   const scopeValue = useMemo(() => scope, [scope]);
 
   return (
-    <SettingsScopeProvider search={scopeValue} onChange={setSettingsScope}>
+    <SettingsScopeProvider
+      search={scopeValue}
+      singleEnvironment={path === "/settings/providers"}
+      onChange={setSettingsScope}
+    >
       <div
         className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background text-foreground"
         data-settings-editor-plane=""
       >
         <WorkspacePageHeader>
           <div className="flex w-full min-w-0 items-center gap-3">
-            <SettingsBreadcrumb
-              pathname={locationLikePathname}
-              scope={
-                showScope
-                  ? { value: scopeValue, groups, environments, onChange: setSettingsScope }
-                  : undefined
-              }
-            />
+            <SettingsBreadcrumb pathname={path} />
             {path === "/settings/general" ? (
               <div className="flex shrink-0 items-center">
                 <RestoreDeviceDefaultsButton

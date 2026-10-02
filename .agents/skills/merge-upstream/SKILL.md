@@ -1,7 +1,7 @@
 ---
 name: merge-upstream
 description: >-
-  Selectively merge the latest stable upstream release into detroitpro/t3code.
+  Merge the latest stable upstream release tag into detroitpro/t3code.
   Use when the user says merge upstream, sync upstream, triage upstream, pull
   upstream release, or catch up with a shipped upstream version — never tip-of-main.
 disable-model-invocation: true
@@ -9,9 +9,9 @@ disable-model-invocation: true
 
 # Merge upstream
 
-Bring commits from the **latest stable upstream release** into `detroitpro/t3code`,
-triaged one by one. Prefer keeping local/personal changes. Never contribute
-anything back to the source repo via its GitHub UI/API.
+Bring the **latest stable upstream release** into `detroitpro/t3code`. Prefer
+keeping local/personal changes. Never contribute anything back to the source
+repo via its GitHub UI/API.
 
 ## Hard guardrails
 
@@ -23,8 +23,8 @@ anything back to the source repo via its GitHub UI/API.
 - Sync target is the latest **stable** tag only: `vX.Y.Z` with no suffix.
   **Refuse** tip-of-main, `*-nightly.*`, `*-preview.*`, `*-rc*`, and drafts
   unless the user explicitly overrides for this run.
-- Do **not** run a blind tip-of-main merge or `make sync` (that target is
-  disabled).
+- Do **not** merge tip-of-main or run `make sync` (that target is disabled).
+  Merging the stable tag is the default.
 - Default **keep local intent** on conflicts. Drop or skip the upstream hunk
   when it fights a deliberate personal change; record the skip rather than
   inventing a blend.
@@ -78,61 +78,55 @@ Do **not** resolve the target via `gh` against the source GitHub copy. Tags via
 
 ## Process
 
-Two phases. Finish **Plan** before any cherry-pick. In **Execute**, one checklist
-item at a time — do not start the next until the current one is merged, skipped,
-or the user defers.
-
-### Phase 1 — Plan (single GitHub issue)
+Default is **one merge of tag `T`**, not per-commit cherry-picks. Releases carry
+hundreds of commits and our local work is a thin layer of web-UI changes, so the
+merge is mostly clean and the real work is the conflicts.
 
 1. **Remotes.** Confirm `origin` → `detroitpro/t3code` and that **no** permanent
-   remote points at the source GitHub copy (`git remote -v`). If one exists,
-   remove it (`git remote remove <name>`) before continuing, then
-   `gh repo set-default detroitpro/t3code`.
+   remote points at the source GitHub copy (`git remote -v`). Remove one if found.
 2. **Resolve `T`** per above. Stop if already an ancestor of `origin/main`.
-3. **Candidate list** — commits in the release that this repo lacks:
+3. **Size it.** `git rev-list --count origin/main.."$T"` (incoming) and
+   `git log --oneline --no-merges "$T"..origin/main` (our local changes — the
+   intent to protect).
+4. **Branch and merge.** `git switch -c chore/upstream-sync-$T origin/main`, then
+   `git merge --no-ff --no-commit "$T"`.
+5. **Resolve conflicts** with `resolving-merge-conflicts`, biased to keep local
+   intent while porting upstream's improvements into our structure. For each
+   file, `git log --oneline $(git merge-base origin/main "$T")..origin/main -- <file>`
+   names the local commit whose intent you are protecting. Recurring patterns:
+   - Upstream product workflows stay `workflow_dispatch`-only; keep ours.
+   - Upstream restyles (className → variants, token classes) inside code we
+     moved: re-apply the upstream markup in our new location.
+   - Upstream additions that assume chrome we replaced (titlebar strips,
+     sidebar header/utility menu, fixed sidebar toggle): drop the chrome, keep
+     the behavior (shortcuts, trackers, a11y attributes) wired into ours.
+6. **Find semantic conflicts.** A clean textual merge can still break: removed
+   exports we use, refactored props we threaded through, deleted scripts our
+   `ci-ui.yml` calls. Run `make deps`, then typecheck web, mobile, contracts,
+   client-runtime, desktop, server; lint; `vp fmt`; targeted tests for the
+   files our local commits touch.
+   Upstream's oxlint rules tighten over time — fix our code to the new rules
+   rather than disabling them.
+7. **Commit** the merge (`chore: merge upstream <T>`; list conflict decisions and
+   anything dropped in the body). Ask before pushing or opening a PR; when asked,
+   `gh pr create --repo detroitpro/t3code` and `link_pull_request`.
+8. **Land it as a merge commit.** Squash or rebase drops `T` from `main`'s
+   ancestry, so the next sync replays every conflict. The repo disables merge
+   commits by default: ask the user to allow them for this PR
+   (`gh api -X PATCH repos/detroitpro/t3code -f allow_merge_commit=true`, then
+   `gh pr merge --merge`) or to fast-forward `main` to the branch. Afterwards
+   `git merge-base --is-ancestor "$T" origin/main` must succeed.
 
-   ```bash
-   git log --oneline --reverse origin/main.."$T"
-   ```
+Use per-item cherry-picks and a triage plan issue only when the user wants to
+leave specific upstream changes out. Then: list `origin/main.."$T"` grouped by
+PR number, triage `take` / `skip` / `ask` one unit at a time, record decisions
+in one issue on `detroitpro/t3code` (template below), and land each `take` as
+its own PR.
 
-   Group adjacent commits that share one PR number (`(#NNNN)` in the subject)
-   into a single triage unit; list every SHA in the unit. Prefer oldest-first
-   (cherry-pick order).
+Toolchain: the repo wants Node 24. On older Node, lint and vitest fail to load
+`.ts` configs/plugins; `NODE_OPTIONS=--experimental-strip-types` works around it.
 
-4. **Prior skips.** Search this repo’s issues
-   (`gh issue list -R detroitpro/t3code --state all --search "upstream sync"`)
-   and treat previously skipped SHAs/PRs as already decided unless the user
-   reopens them.
-5. **Triage one by one.** For each unit, show: subject / PR, paths touched,
-   whether it overlaps local web-UI changes, and a recommendation
-   (`take` / `skip` / `ask`). Default is `take` unless it clearly fights known
-   local intent. Wait for the user’s call before moving on. Do not auto-accept a
-   long batch.
-6. **Open one plan issue** on `detroitpro/t3code` with the template below. Title
-   like `chore: upstream sync <tag>`. Stop after the issue exists and the user
-   picks which `take` item to execute first.
-
-### Phase 2 — Execute (one checklist item)
-
-For the chosen `take` item only:
-
-1. Branch from up-to-date `origin/main`.
-2. Cherry-pick the SHA(s) (or an equivalent minimal apply). No full merge of
-   tip-of-main. Merging tag `T` in one shot is only OK if the user asks for
-   that instead of per-item cherry-picks.
-3. On conflict: keep local intent; use `resolving-merge-conflicts` with that bias.
-   If the upstream change cannot land without wrecking deliberate local behavior,
-   **skip**, record the reason on the plan issue, and abort the branch.
-4. Verify narrowly (targeted tests / typecheck for touched paths). No repo-wide
-   suite unless asked.
-5. Land a PR to `detroitpro/t3code` with
-   `gh pr create --repo detroitpro/t3code` (conventional title). Link the plan
-   issue. Register the PR with the thread (`link_pull_request`) when that tool
-   exists.
-6. Update the plan issue checklist (`take` → done with PR link, or → skipped).
-7. Stop and ask which item is next.
-
-## Plan issue template
+## Plan issue template (cherry-pick mode only)
 
 ```markdown
 ## Upstream sync plan
@@ -166,9 +160,8 @@ For the chosen `take` item only:
 
 ## Done when
 
-- `origin/main` already contained `T`, or a plan issue exists for this campaign, and
-- Every `take` the user wanted landed as its own PR (or was reclassified), and
-- Every `skip` has a written reason on that issue, and
+- `origin/main` already contains `T`, or a merge branch for `T` typechecks, lints,
+  and passes targeted tests with every conflict decision recorded in the commit, and
 - No permanent upstream remote exists, no GitHub API was used against the source
   copy, and tip-of-main / nightly / preview were not merged unless explicitly
   overridden.

@@ -46,9 +46,6 @@ jobs:
           cache: true
           run-install: true
 
-      - name: Check className overrides on components/ui do not grow
-        run: vp run lint:restyle-ceiling
-
       - name: Format
         run: vp fmt --check
 

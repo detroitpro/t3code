@@ -34,7 +34,35 @@ describe("terminalUiStateStore actions", () => {
       activeTerminalId: "",
       terminalGroups: [],
       activeTerminalGroupId: "",
+      hostBindingsByTerminalId: {},
     });
+  });
+
+  it("stores a foreign host binding on new terminals and preserves it across reconcile", () => {
+    const store = useTerminalUiStateStore.getState();
+    store.setTerminalOpen(THREAD_REF, true);
+    store.newTerminal(THREAD_REF, "term-local", {
+      hostBinding: {
+        executionEnvironmentId: "environment-b" as never,
+        hostThreadId: ThreadId.make("foreign:environment-a:thread-1"),
+        cwd: "/Users/me/proj",
+        worktreePath: null,
+      },
+    });
+
+    let terminalUiState = selectThreadTerminalUiState(
+      useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+      THREAD_REF,
+    );
+    expect(terminalUiState.hostBindingsByTerminalId["term-local"]?.cwd).toBe("/Users/me/proj");
+
+    store.reconcileTerminalIds(THREAD_REF, [DEFAULT_THREAD_TERMINAL_ID]);
+    terminalUiState = selectThreadTerminalUiState(
+      useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+      THREAD_REF,
+    );
+    expect(terminalUiState.terminalIds).toEqual([DEFAULT_THREAD_TERMINAL_ID, "term-local"]);
+    expect(terminalUiState.hostBindingsByTerminalId["term-local"]?.cwd).toBe("/Users/me/proj");
   });
 
   it("seeds an open default terminal only when the thread has no stored state", () => {
@@ -116,6 +144,7 @@ describe("terminalUiStateStore actions", () => {
         },
       ],
       activeTerminalGroupId: `group-${DEFAULT_THREAD_TERMINAL_ID}`,
+      hostBindingsByTerminalId: {},
     });
   });
 

@@ -31,6 +31,15 @@ Terms whose meaning matters across T3 Code. Architecture and lifecycle constrain
 | Runtime receipt         | A test-only signal that an asynchronous milestone completed.                                 |
 | Quiesced                | The relevant follow-up workers have finished, beyond the provider turn merely ending.        |
 
+## Subagents
+
+| Term         | Meaning                                                                                                                                |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Subagent     | A delegated child run inside a thread (direct spawn or workflow member), distinct from the thread's primary provider session.          |
+| Agents panel | Web/desktop right-panel surface that monitors subagents for the current thread. Live-ops first; see [Agents panel](./agents-panel.md). |
+| Direct spawn | A subagent not belonging to a workflow coordinator; shown under Working / Idle / Completed bands.                                      |
+| Mission      | The problem a subagent was assigned to solve; carried as the subagent `title` in the panel.                                            |
+
 ## Providers and checkpoints
 
 | Term                | Meaning                                                                                                      |

@@ -138,7 +138,17 @@ for custom configuration.
 
 ## Inspect agent work
 
-On web and desktop, use **Agents** to follow work delegated to subagents.
+On web and desktop, open **Agents** in the right panel to follow work delegated
+to subagents for the current thread. The panel is for live work first: **Working**
+lists agents still in progress, **Idle** appears only when a resumable agent is
+waiting, and **Completed** is a collapsed shelf for finished agents (including
+failures). Agents complete their tasks; that is separate from settling a thread.
+
+Each card leads with the agent's **mission** (the problem it was assigned) and a
+short line for its current step. Expand a card to read the full mission; open
+**Steps** inside for recent activity and the outcome. Model and token totals stay
+on the card as secondary detail. Live workflow runs stay at the top; finished
+runs join the Completed shelf as a unit.
 
 Expand a tool call in the conversation to see its full command and output.
 Summaries shorten shell wrappers and can still describe the latest call after it

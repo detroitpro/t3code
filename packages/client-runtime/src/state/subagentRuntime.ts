@@ -866,6 +866,60 @@ export function deriveAgentPanelModel({
  * ("claude-sonnet-5[1m]" → "sonnet-5[1m]", "claude-opus-4-20250514" →
  * "opus-4"). Unknown ids pass through untouched; effort appends as "· high".
  */
+/**
+ * Panel bands for live-ops: Working (pending/running/waiting), Idle
+ * (resumable), Completed (terminal — success or failure). Working/idle keep
+ * caller order (spawn/first-seen). Completed sorts newest completion first.
+ * Agents complete; threads settle — do not label these bands "settled".
+ */
+export function partitionAgentsForPanel(agents: ReadonlyArray<RuntimeSubagent>): {
+  readonly working: ReadonlyArray<RuntimeSubagent>;
+  readonly idle: ReadonlyArray<RuntimeSubagent>;
+  readonly completed: ReadonlyArray<RuntimeSubagent>;
+} {
+  const working: RuntimeSubagent[] = [];
+  const idle: RuntimeSubagent[] = [];
+  const completed: RuntimeSubagent[] = [];
+  for (const agent of agents) {
+    if (isActiveSubagentStatus(agent.status)) {
+      working.push(agent);
+    } else if (agent.status === "idle") {
+      idle.push(agent);
+    } else {
+      completed.push(agent);
+    }
+  }
+  completed.sort(
+    (a, b) =>
+      (b.completedAt ?? b.updatedAt).localeCompare(a.completedAt ?? a.updatedAt) ||
+      b.id.localeCompare(a.id),
+  );
+  return { working, idle, completed };
+}
+
+/** Live workflows stay at the top; terminal runs join the Completed shelf as units. */
+export function partitionWorkflowsForPanel(workflows: ReadonlyArray<AgentPanelWorkflowGroup>): {
+  readonly live: ReadonlyArray<AgentPanelWorkflowGroup>;
+  readonly completed: ReadonlyArray<AgentPanelWorkflowGroup>;
+} {
+  const live: AgentPanelWorkflowGroup[] = [];
+  const completed: AgentPanelWorkflowGroup[] = [];
+  for (const group of workflows) {
+    if (isTerminalSubagentStatus(group.workflow.status)) {
+      completed.push(group);
+    } else {
+      live.push(group);
+    }
+  }
+  completed.sort(
+    (a, b) =>
+      (b.workflow.completedAt ?? b.workflow.updatedAt).localeCompare(
+        a.workflow.completedAt ?? a.workflow.updatedAt,
+      ) || b.workflow.id.localeCompare(a.workflow.id),
+  );
+  return { live, completed };
+}
+
 export function formatSubagentModelLabel(
   model: string | null,
   effort: string | null,

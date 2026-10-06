@@ -1104,9 +1104,8 @@ function NewTerminalActionControl(props: {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className={props.className}
         aria-label={props.label}
-        render={<button type="button" />}
+        render={<button type="button" className={props.className} aria-label={props.label} />}
       >
         {props.children}
         <ChevronDown className="size-2.5 opacity-70" />

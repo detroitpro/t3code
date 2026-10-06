@@ -11,19 +11,25 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { resolveStorage } from "./lib/storage";
 import {
+  normalizeHostBindingsByTerminalId,
+  type TerminalHostBinding,
+} from "./lib/terminalHostBinding";
+import {
   DEFAULT_THREAD_TERMINAL_HEIGHT,
   DEFAULT_THREAD_TERMINAL_ID,
   MAX_TERMINALS_PER_GROUP,
   type ThreadTerminalGroup,
 } from "./types";
 
-interface ThreadTerminalUiState {
+export interface ThreadTerminalUiState {
   terminalOpen: boolean;
   terminalHeight: number;
   terminalIds: string[];
   activeTerminalId: string;
   terminalGroups: ThreadTerminalGroup[];
   activeTerminalGroupId: string;
+  /** Tabs whose PTY runs on a different environment than the viewing thread. */
+  hostBindingsByTerminalId: Record<string, TerminalHostBinding>;
 }
 
 // Keep the old storage key so existing drawer layout preferences migrate.
@@ -166,6 +172,29 @@ function terminalGroupsEqual(left: ThreadTerminalGroup[], right: ThreadTerminalG
   return true;
 }
 
+function hostBindingsEqual(
+  left: Record<string, TerminalHostBinding>,
+  right: Record<string, TerminalHostBinding>,
+): boolean {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (const key of leftKeys) {
+    const leftBinding = left[key];
+    const rightBinding = right[key];
+    if (!leftBinding || !rightBinding) return false;
+    if (
+      leftBinding.executionEnvironmentId !== rightBinding.executionEnvironmentId ||
+      leftBinding.hostThreadId !== rightBinding.hostThreadId ||
+      leftBinding.cwd !== rightBinding.cwd ||
+      leftBinding.worktreePath !== rightBinding.worktreePath
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function threadTerminalUiStateEqual(
   left: ThreadTerminalUiState,
   right: ThreadTerminalUiState,
@@ -176,7 +205,8 @@ function threadTerminalUiStateEqual(
     left.activeTerminalId === right.activeTerminalId &&
     left.activeTerminalGroupId === right.activeTerminalGroupId &&
     arraysEqual(left.terminalIds, right.terminalIds) &&
-    terminalGroupsEqual(left.terminalGroups, right.terminalGroups)
+    terminalGroupsEqual(left.terminalGroups, right.terminalGroups) &&
+    hostBindingsEqual(left.hostBindingsByTerminalId, right.hostBindingsByTerminalId)
   );
 }
 
@@ -187,6 +217,7 @@ const DEFAULT_THREAD_TERMINAL_UI_STATE: ThreadTerminalUiState = Object.freeze({
   activeTerminalId: "",
   terminalGroups: [],
   activeTerminalGroupId: "",
+  hostBindingsByTerminalId: {},
 });
 
 function createDefaultThreadTerminalUiState(): ThreadTerminalUiState {
@@ -194,6 +225,7 @@ function createDefaultThreadTerminalUiState(): ThreadTerminalUiState {
     ...DEFAULT_THREAD_TERMINAL_UI_STATE,
     terminalIds: [...DEFAULT_THREAD_TERMINAL_UI_STATE.terminalIds],
     terminalGroups: copyTerminalGroups(DEFAULT_THREAD_TERMINAL_UI_STATE.terminalGroups),
+    hostBindingsByTerminalId: {},
   };
 }
 
@@ -215,6 +247,10 @@ function normalizeThreadTerminalUiState(state: ThreadTerminalUiState): ThreadTer
   const activeGroupIdFromTerminal =
     terminalGroups.find((group) => group.terminalIds.includes(activeTerminalId))?.id ?? null;
 
+  const hostBindingsByTerminalId = normalizeHostBindingsByTerminalId(
+    state.hostBindingsByTerminalId,
+    nextTerminalIds,
+  );
   const normalized: ThreadTerminalUiState = {
     terminalOpen: state.terminalOpen,
     terminalHeight:
@@ -226,6 +262,7 @@ function normalizeThreadTerminalUiState(state: ThreadTerminalUiState): ThreadTer
     terminalGroups,
     activeTerminalGroupId:
       activeGroupIdFromState ?? activeGroupIdFromTerminal ?? terminalGroups[0]?.id ?? "",
+    hostBindingsByTerminalId,
   };
   return threadTerminalUiStateEqual(state, normalized) ? state : normalized;
 }
@@ -251,11 +288,33 @@ function copyTerminalGroups(groups: ThreadTerminalGroup[]): ThreadTerminalGroup[
   }));
 }
 
+function withHostBinding(
+  state: ThreadTerminalUiState,
+  terminalId: string,
+  hostBinding: TerminalHostBinding | undefined,
+): ThreadTerminalUiState {
+  if (!hostBinding) {
+    if (state.hostBindingsByTerminalId[terminalId] === undefined) {
+      return state;
+    }
+    const { [terminalId]: _removed, ...rest } = state.hostBindingsByTerminalId;
+    return { ...state, hostBindingsByTerminalId: rest };
+  }
+  return {
+    ...state,
+    hostBindingsByTerminalId: {
+      ...state.hostBindingsByTerminalId,
+      [terminalId]: hostBinding,
+    },
+  };
+}
+
 function upsertTerminalIntoGroups(
   state: ThreadTerminalUiState,
   terminalId: string,
   mode: "split" | "new",
   splitDirection: "horizontal" | "vertical" = "horizontal",
+  hostBinding?: TerminalHostBinding,
 ): ThreadTerminalUiState {
   const normalized = normalizeThreadTerminalUiState(state);
   const effectiveMode: "split" | "new" = normalized.terminalIds.length === 0 ? "new" : mode;
@@ -283,14 +342,20 @@ function upsertTerminalIntoGroups(
     const usedGroupIds = new Set(terminalGroups.map((group) => group.id));
     const nextGroupId = assignUniqueGroupId(fallbackGroupId(terminalId), usedGroupIds);
     terminalGroups.push({ id: nextGroupId, terminalIds: [terminalId] });
-    return normalizeThreadTerminalUiState({
-      ...normalized,
-      terminalOpen: true,
-      terminalIds,
-      activeTerminalId: terminalId,
-      terminalGroups,
-      activeTerminalGroupId: nextGroupId,
-    });
+    return normalizeThreadTerminalUiState(
+      withHostBinding(
+        {
+          ...normalized,
+          terminalOpen: true,
+          terminalIds,
+          activeTerminalId: terminalId,
+          terminalGroups,
+          activeTerminalGroupId: nextGroupId,
+        },
+        terminalId,
+        hostBinding,
+      ),
+    );
   }
 
   let activeGroupIndex = terminalGroups.findIndex(
@@ -337,14 +402,20 @@ function upsertTerminalIntoGroups(
     delete destinationGroup.splitDirection;
   }
 
-  return normalizeThreadTerminalUiState({
-    ...normalized,
-    terminalOpen: true,
-    terminalIds,
-    activeTerminalId: terminalId,
-    terminalGroups,
-    activeTerminalGroupId: destinationGroup.id,
-  });
+  return normalizeThreadTerminalUiState(
+    withHostBinding(
+      {
+        ...normalized,
+        terminalOpen: true,
+        terminalIds,
+        activeTerminalId: terminalId,
+        terminalGroups,
+        activeTerminalGroupId: destinationGroup.id,
+      },
+      terminalId,
+      hostBinding,
+    ),
+  );
 }
 
 function setThreadTerminalOpen(state: ThreadTerminalUiState, open: boolean): ThreadTerminalUiState {
@@ -371,15 +442,19 @@ function splitThreadTerminal(
   state: ThreadTerminalUiState,
   terminalId: string,
   direction: "horizontal" | "vertical" = "horizontal",
+  hostBinding?: TerminalHostBinding,
 ): ThreadTerminalUiState {
-  return upsertTerminalIntoGroups(state, terminalId, "split", direction);
+  const inheritedBinding =
+    hostBinding ?? state.hostBindingsByTerminalId[state.activeTerminalId] ?? undefined;
+  return upsertTerminalIntoGroups(state, terminalId, "split", direction, inheritedBinding);
 }
 
 function newThreadTerminal(
   state: ThreadTerminalUiState,
   terminalId: string,
+  hostBinding?: TerminalHostBinding,
 ): ThreadTerminalUiState {
-  return upsertTerminalIntoGroups(state, terminalId, "new");
+  return upsertTerminalIntoGroups(state, terminalId, "new", "horizontal", hostBinding);
 }
 
 function setThreadActiveTerminal(
@@ -441,6 +516,9 @@ function closeThreadTerminal(
     terminalGroups[0]?.id ??
     fallbackGroupId(nextActiveTerminalId);
 
+  const { [terminalId]: _closedBinding, ...remainingBindings } =
+    normalized.hostBindingsByTerminalId;
+
   return normalizeThreadTerminalUiState({
     terminalOpen: normalized.terminalOpen,
     terminalHeight: normalized.terminalHeight,
@@ -448,6 +526,7 @@ function closeThreadTerminal(
     activeTerminalId: nextActiveTerminalId,
     terminalGroups,
     activeTerminalGroupId: nextActiveTerminalGroupId,
+    hostBindingsByTerminalId: remainingBindings,
   });
 }
 
@@ -456,21 +535,28 @@ function reconcileThreadTerminalSessionIds(
   nextIds: string[],
 ): ThreadTerminalUiState {
   const normalized = normalizeThreadTerminalUiState(state);
-  if (arraysEqual(normalized.terminalIds, nextIds)) {
+  // Keep borrowed-host tabs the remote metadata stream never lists.
+  const foreignIds = normalized.terminalIds.filter(
+    (terminalId) =>
+      normalized.hostBindingsByTerminalId[terminalId] !== undefined &&
+      !nextIds.includes(terminalId),
+  );
+  const mergedIds = foreignIds.length === 0 ? nextIds : [...nextIds, ...foreignIds];
+  if (arraysEqual(normalized.terminalIds, mergedIds)) {
     return normalized;
   }
 
-  const nextActiveTerminalId = nextIds.includes(normalized.activeTerminalId)
+  const nextActiveTerminalId = mergedIds.includes(normalized.activeTerminalId)
     ? normalized.activeTerminalId
-    : (nextIds[0] ?? "");
+    : (mergedIds[0] ?? "");
 
-  const terminalGroups = normalizeTerminalGroups(normalized.terminalGroups, nextIds);
+  const terminalGroups = normalizeTerminalGroups(normalized.terminalGroups, mergedIds);
   const activeGroupIdFromTerminal =
     terminalGroups.find((group) => group.terminalIds.includes(nextActiveTerminalId))?.id ?? null;
 
   return normalizeThreadTerminalUiState({
     ...normalized,
-    terminalIds: nextIds,
+    terminalIds: mergedIds,
     activeTerminalId: nextActiveTerminalId,
     terminalGroups,
     activeTerminalGroupId: activeGroupIdFromTerminal ?? terminalGroups[0]?.id ?? "",
@@ -484,9 +570,18 @@ export function selectThreadTerminalUiState(
   if (!threadRef || threadRef.threadId.length === 0) {
     return getDefaultThreadTerminalUiState();
   }
-  return (
-    terminalUiStateByThreadKey[terminalThreadKey(threadRef)] ?? getDefaultThreadTerminalUiState()
-  );
+  const stored = terminalUiStateByThreadKey[terminalThreadKey(threadRef)];
+  if (!stored) {
+    return getDefaultThreadTerminalUiState();
+  }
+  // Persisted pre-binding layouts omit the map; normalize fills it.
+  if (stored.hostBindingsByTerminalId !== undefined) {
+    return stored;
+  }
+  return normalizeThreadTerminalUiState({
+    ...stored,
+    hostBindingsByTerminalId: {},
+  });
 }
 
 function updateTerminalUiStateByThreadKey(
@@ -566,9 +661,21 @@ interface TerminalUiStateStoreState {
   suppressedTerminalIdsByThreadKey: Record<string, string[]>;
   setTerminalOpen: (threadRef: ScopedThreadRef, open: boolean) => void;
   setTerminalHeight: (threadRef: ScopedThreadRef, height: number) => void;
-  splitTerminal: (threadRef: ScopedThreadRef, terminalId: string) => void;
-  splitTerminalVertical: (threadRef: ScopedThreadRef, terminalId: string) => void;
-  newTerminal: (threadRef: ScopedThreadRef, terminalId: string) => void;
+  splitTerminal: (
+    threadRef: ScopedThreadRef,
+    terminalId: string,
+    options?: { hostBinding?: TerminalHostBinding },
+  ) => void;
+  splitTerminalVertical: (
+    threadRef: ScopedThreadRef,
+    terminalId: string,
+    options?: { hostBinding?: TerminalHostBinding },
+  ) => void;
+  newTerminal: (
+    threadRef: ScopedThreadRef,
+    terminalId: string,
+    options?: { hostBinding?: TerminalHostBinding },
+  ) => void;
   /**
    * Open the drawer with the default terminal when this thread has no stored UI
    * state yet. Returns true when seeding ran so the caller can start a PTY.
@@ -645,21 +752,33 @@ export const useTerminalUiStateStore = create<TerminalUiStateStoreState>()(
         },
         setTerminalHeight: (threadRef, height) =>
           updateTerminal(threadRef, (state) => setThreadTerminalHeight(state, height)),
-        splitTerminal: (threadRef, terminalId) =>
-          updateTerminal(threadRef, (state) => splitThreadTerminal(state, terminalId), {
-            terminalId,
-            suppressed: false,
-          }),
-        splitTerminalVertical: (threadRef, terminalId) =>
-          updateTerminal(threadRef, (state) => splitThreadTerminal(state, terminalId, "vertical"), {
-            terminalId,
-            suppressed: false,
-          }),
-        newTerminal: (threadRef, terminalId) =>
-          updateTerminal(threadRef, (state) => newThreadTerminal(state, terminalId), {
-            terminalId,
-            suppressed: false,
-          }),
+        splitTerminal: (threadRef, terminalId, options) =>
+          updateTerminal(
+            threadRef,
+            (state) => splitThreadTerminal(state, terminalId, "horizontal", options?.hostBinding),
+            {
+              terminalId,
+              suppressed: false,
+            },
+          ),
+        splitTerminalVertical: (threadRef, terminalId, options) =>
+          updateTerminal(
+            threadRef,
+            (state) => splitThreadTerminal(state, terminalId, "vertical", options?.hostBinding),
+            {
+              terminalId,
+              suppressed: false,
+            },
+          ),
+        newTerminal: (threadRef, terminalId, options) =>
+          updateTerminal(
+            threadRef,
+            (state) => newThreadTerminal(state, terminalId, options?.hostBinding),
+            {
+              terminalId,
+              suppressed: false,
+            },
+          ),
         seedTerminalOnNewThread: (threadRef) => {
           if (threadRef.threadId.length === 0) {
             return false;

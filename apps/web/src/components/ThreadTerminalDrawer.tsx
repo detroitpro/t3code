@@ -11,6 +11,7 @@ import {
   type TerminalSessionState,
 } from "@t3tools/client-runtime/state/terminal";
 import {
+  ChevronDown,
   Plus,
   Square,
   SquareSplitHorizontal,
@@ -20,6 +21,7 @@ import {
 } from "lucide-react";
 import {
   type ContextMenuItem,
+  type EnvironmentId,
   type ProviderInstanceId,
   type ResolvedKeybindingsConfig,
   type ScopedThreadRef,
@@ -41,11 +43,18 @@ import {
 } from "react";
 import { Popover, PopoverPopup, PopoverTrigger } from "~/components/ui/popover";
 import { Button } from "~/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "~/components/ui/menu";
 import { PanelTabCloseButton } from "~/components/ui/panel-tab-close-button";
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
 import { readTextFromClipboard, writeTextToClipboard } from "~/hooks/useCopyToClipboard";
 import { cn } from "~/lib/utils";
 import { type TerminalContextSelection } from "~/lib/terminalContext";
+import { isForeignTerminalHostBinding, type TerminalHostBinding } from "~/lib/terminalHostBinding";
 import {
   observeSelectionActions,
   resolveSelectionActionPosition,
@@ -314,9 +323,12 @@ export function shouldHandleTerminalExit(
 interface TerminalViewportProps {
   advancedTypography: boolean;
   threadRef: ScopedThreadRef;
-  threadId: ThreadId;
+  /** Environment that owns the PTY (may differ from the viewing thread). */
+  sessionEnvironmentId: EnvironmentId;
+  sessionThreadId: ThreadId;
   terminalId: string;
   terminalLabel: string;
+  hostLabel?: string | undefined;
   cwd: string;
   worktreePath?: string | null;
   runtimeEnv?: Record<string, string>;
@@ -340,9 +352,11 @@ interface TerminalLaunchLocation {
 export function TerminalViewport({
   advancedTypography,
   threadRef,
-  threadId,
+  sessionEnvironmentId,
+  sessionThreadId,
   terminalId,
   terminalLabel,
+  hostLabel,
   cwd,
   worktreePath,
   runtimeEnv,
@@ -359,7 +373,8 @@ export function TerminalViewport({
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<GhosttyTerminalSurface | null>(null);
   const visibleRef = useRef(visible);
-  const environmentId = threadRef.environmentId;
+  const environmentId = sessionEnvironmentId;
+  const threadId = sessionThreadId;
   const serverConfig = useAtomValue(serverEnvironment.configValueAtom(environmentId));
   const openInPreferredEditor = useOpenInPreferredEditor(
     environmentId,
@@ -390,7 +405,9 @@ export function TerminalViewport({
     onAddTerminalContext?.(selection);
   });
   const canAddSelectionToChat = useEffectEvent(() => onAddTerminalContext !== undefined);
-  const readTerminalLabel = useEffectEvent(() => terminalLabel);
+  const readTerminalLabel = useEffectEvent(() =>
+    hostLabel ? `${terminalLabel} · ${hostLabel}` : terminalLabel,
+  );
   const terminalFontFamily = useClientSettings((settings) =>
     resolveTerminalFontPreference({
       advanced: advancedTypography,
@@ -1015,6 +1032,9 @@ interface ThreadTerminalDrawerProps {
   onSplitTerminal: () => void;
   onSplitTerminalVertical: () => void;
   onNewTerminal: () => void;
+  /** When set, the + control becomes a menu that can open a shell on this machine. */
+  onNewTerminalOnThisMachine?: (() => void) | undefined;
+  thisMachineLabel?: string | undefined;
   splitShortcutLabel?: string | undefined;
   splitVerticalShortcutLabel?: string | undefined;
   newShortcutLabel?: string | undefined;
@@ -1028,6 +1048,8 @@ interface ThreadTerminalDrawerProps {
   terminalLabelsById?: ReadonlyMap<string, string>;
   /** Prefer per-session launch locations when the server already knows a terminal. */
   terminalLaunchLocationsById?: ReadonlyMap<string, TerminalLaunchLocation>;
+  hostBindingsByTerminalId?: Readonly<Record<string, TerminalHostBinding>>;
+  hostLabelsByEnvironmentId?: ReadonlyMap<EnvironmentId, string>;
 }
 
 interface TerminalActionButtonProps {
@@ -1059,6 +1081,45 @@ function TerminalActionButton({ label, className, onClick, children }: TerminalA
   );
 }
 
+function NewTerminalActionControl(props: {
+  className: string;
+  label: string;
+  thisMachineLabel: string;
+  onNewTerminal: () => void;
+  onNewTerminalOnThisMachine?: (() => void) | undefined;
+  children: ReactNode;
+}) {
+  if (!props.onNewTerminalOnThisMachine) {
+    return (
+      <TerminalActionButton
+        className={props.className}
+        onClick={props.onNewTerminal}
+        label={props.label}
+      >
+        {props.children}
+      </TerminalActionButton>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label={props.label}
+        render={<button type="button" className={props.className} aria-label={props.label} />}
+      >
+        {props.children}
+        <ChevronDown className="size-2.5 opacity-70" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" side="bottom" sideOffset={6}>
+        <DropdownMenuItem onClick={props.onNewTerminal}>On this host</DropdownMenuItem>
+        <DropdownMenuItem onClick={props.onNewTerminalOnThisMachine}>
+          {props.thisMachineLabel}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export default function ThreadTerminalDrawer({
   mode = "drawer",
   fillAvailable = false,
@@ -1078,6 +1139,8 @@ export default function ThreadTerminalDrawer({
   onSplitTerminal,
   onSplitTerminalVertical,
   onNewTerminal,
+  onNewTerminalOnThisMachine,
+  thisMachineLabel,
   splitShortcutLabel,
   splitVerticalShortcutLabel,
   newShortcutLabel,
@@ -1089,6 +1152,8 @@ export default function ThreadTerminalDrawer({
   keybindings,
   terminalLabelsById,
   terminalLaunchLocationsById,
+  hostBindingsByTerminalId,
+  hostLabelsByEnvironmentId,
 }: ThreadTerminalDrawerProps) {
   const isPanel = mode === "panel";
   const useFillHeight = isPanel || fillAvailable;
@@ -1255,6 +1320,13 @@ export default function ThreadTerminalDrawer({
   }, [normalizedTerminalIds, terminalLabelsById]);
   const resolveTerminalLaunchLocation = useCallback(
     (terminalId: string): TerminalLaunchLocation => {
+      const binding = hostBindingsByTerminalId?.[terminalId];
+      if (binding) {
+        return {
+          cwd: binding.cwd,
+          worktreePath: binding.worktreePath,
+        };
+      }
       return (
         terminalLaunchLocationsById?.get(terminalId) ?? {
           cwd,
@@ -1263,7 +1335,27 @@ export default function ThreadTerminalDrawer({
         }
       );
     },
-    [cwd, runtimeEnv, terminalLaunchLocationsById, worktreePath],
+    [cwd, hostBindingsByTerminalId, runtimeEnv, terminalLaunchLocationsById, worktreePath],
+  );
+  const resolveTerminalSessionIds = useCallback(
+    (terminalId: string) => {
+      const binding = hostBindingsByTerminalId?.[terminalId];
+      if (binding) {
+        return {
+          environmentId: binding.executionEnvironmentId,
+          threadId: binding.hostThreadId,
+          hostLabel: isForeignTerminalHostBinding(threadRef.environmentId, binding)
+            ? (hostLabelsByEnvironmentId?.get(binding.executionEnvironmentId) ?? "This machine")
+            : undefined,
+        };
+      }
+      return {
+        environmentId: threadRef.environmentId,
+        threadId,
+        hostLabel: undefined as string | undefined,
+      };
+    },
+    [hostBindingsByTerminalId, hostLabelsByEnvironmentId, threadId, threadRef.environmentId],
   );
   const splitTerminalActionLabel = hasReachedSplitLimit
     ? `Split Terminal Horizontally (max ${MAX_TERMINALS_PER_GROUP} per group)`
@@ -1278,6 +1370,9 @@ export default function ThreadTerminalDrawer({
   const newTerminalActionLabel = newShortcutLabel
     ? `New Terminal (${newShortcutLabel})`
     : "New Terminal";
+  const thisMachineActionLabel = thisMachineLabel
+    ? `New Terminal on ${thisMachineLabel}`
+    : "New Terminal on This Machine";
   const closeTerminalActionLabel = closeShortcutLabel
     ? `Close Terminal (${closeShortcutLabel})`
     : "Close Terminal";
@@ -1445,9 +1540,16 @@ export default function ThreadTerminalDrawer({
         ) : null}
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-4 py-6 text-center text-sm text-muted-foreground">
           <p>No terminal sessions for this thread yet.</p>
-          <Button size="xs" variant="outline" onClick={onNewTerminalAction}>
-            {newTerminalActionLabel}
-          </Button>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Button size="xs" variant="outline" onClick={onNewTerminalAction}>
+              {newTerminalActionLabel}
+            </Button>
+            {onNewTerminalOnThisMachine ? (
+              <Button size="xs" variant="outline" onClick={onNewTerminalOnThisMachine}>
+                {thisMachineActionLabel}
+              </Button>
+            ) : null}
+          </div>
         </div>
       </aside>
     );
@@ -1502,13 +1604,15 @@ export default function ThreadTerminalDrawer({
               <SquareSplitVertical className="size-3.25" />
             </TerminalActionButton>
             <div className="h-4 w-px bg-border/80" />
-            <TerminalActionButton
-              className="p-1 text-foreground/90 transition-colors hover:bg-accent"
-              onClick={onNewTerminalAction}
+            <NewTerminalActionControl
+              className="inline-flex items-center gap-0.5 p-1 text-foreground/90 transition-colors hover:bg-accent"
+              onNewTerminal={onNewTerminalAction}
+              onNewTerminalOnThisMachine={onNewTerminalOnThisMachine}
               label={newTerminalActionLabel}
+              thisMachineLabel={thisMachineActionLabel}
             >
               <Plus className="size-3.25" />
-            </TerminalActionButton>
+            </NewTerminalActionControl>
             <div className="h-4 w-px bg-border/80" />
             <TerminalActionButton
               className="p-1 text-foreground/90 transition-colors hover:bg-accent"
@@ -1544,6 +1648,7 @@ export default function ThreadTerminalDrawer({
               >
                 {visibleTerminalIds.map((terminalId) => {
                   const terminalLaunchLocation = resolveTerminalLaunchLocation(terminalId);
+                  const sessionIds = resolveTerminalSessionIds(terminalId);
                   return (
                     <div
                       key={terminalId}
@@ -1566,9 +1671,11 @@ export default function ThreadTerminalDrawer({
                         <TerminalViewport
                           advancedTypography={advancedTypography}
                           threadRef={threadRef}
-                          threadId={threadId}
+                          sessionEnvironmentId={sessionIds.environmentId}
+                          sessionThreadId={sessionIds.threadId}
                           terminalId={terminalId}
                           terminalLabel={terminalLabelById.get(terminalId) ?? "Terminal"}
+                          {...(sessionIds.hostLabel ? { hostLabel: sessionIds.hostLabel } : {})}
                           cwd={terminalLaunchLocation.cwd}
                           {...(terminalLaunchLocation.worktreePath !== undefined
                             ? { worktreePath: terminalLaunchLocation.worktreePath }
@@ -1592,29 +1699,36 @@ export default function ThreadTerminalDrawer({
               </div>
             ) : (
               <div className="h-full">
-                <TerminalViewport
-                  advancedTypography={advancedTypography}
-                  key={resolvedActiveTerminalId}
-                  threadRef={threadRef}
-                  threadId={threadId}
-                  terminalId={resolvedActiveTerminalId}
-                  terminalLabel={terminalLabelById.get(resolvedActiveTerminalId) ?? "Terminal"}
-                  cwd={activeTerminalLaunchLocation.cwd}
-                  {...(activeTerminalLaunchLocation.worktreePath !== undefined
-                    ? { worktreePath: activeTerminalLaunchLocation.worktreePath }
-                    : {})}
-                  {...(activeTerminalLaunchLocation.runtimeEnv
-                    ? { runtimeEnv: activeTerminalLaunchLocation.runtimeEnv }
-                    : {})}
-                  onSessionExited={() => onCloseTerminal(resolvedActiveTerminalId)}
-                  onAddTerminalContext={onAddTerminalContext}
-                  focusRequestId={focusRequestId}
-                  autoFocus
-                  visible={visible}
-                  resizeEpoch={resizeEpoch}
-                  drawerHeight={drawerHeight}
-                  keybindings={keybindings}
-                />
+                {(() => {
+                  const sessionIds = resolveTerminalSessionIds(resolvedActiveTerminalId);
+                  return (
+                    <TerminalViewport
+                      advancedTypography={advancedTypography}
+                      key={resolvedActiveTerminalId}
+                      threadRef={threadRef}
+                      sessionEnvironmentId={sessionIds.environmentId}
+                      sessionThreadId={sessionIds.threadId}
+                      terminalId={resolvedActiveTerminalId}
+                      terminalLabel={terminalLabelById.get(resolvedActiveTerminalId) ?? "Terminal"}
+                      {...(sessionIds.hostLabel ? { hostLabel: sessionIds.hostLabel } : {})}
+                      cwd={activeTerminalLaunchLocation.cwd}
+                      {...(activeTerminalLaunchLocation.worktreePath !== undefined
+                        ? { worktreePath: activeTerminalLaunchLocation.worktreePath }
+                        : {})}
+                      {...(activeTerminalLaunchLocation.runtimeEnv
+                        ? { runtimeEnv: activeTerminalLaunchLocation.runtimeEnv }
+                        : {})}
+                      onSessionExited={() => onCloseTerminal(resolvedActiveTerminalId)}
+                      onAddTerminalContext={onAddTerminalContext}
+                      focusRequestId={focusRequestId}
+                      autoFocus
+                      visible={visible}
+                      resizeEpoch={resizeEpoch}
+                      drawerHeight={drawerHeight}
+                      keybindings={keybindings}
+                    />
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -1645,13 +1759,15 @@ export default function ThreadTerminalDrawer({
                   >
                     <SquareSplitVertical className="size-3.25" />
                   </TerminalActionButton>
-                  <TerminalActionButton
-                    className="inline-flex h-full items-center border-l border-border/70 px-1 text-foreground/90 transition-colors hover:bg-accent/70"
-                    onClick={onNewTerminalAction}
+                  <NewTerminalActionControl
+                    className="inline-flex h-full items-center gap-0.5 border-l border-border/70 px-1 text-foreground/90 transition-colors hover:bg-accent/70"
+                    onNewTerminal={onNewTerminalAction}
+                    onNewTerminalOnThisMachine={onNewTerminalOnThisMachine}
                     label={newTerminalActionLabel}
+                    thisMachineLabel={thisMachineActionLabel}
                   >
                     <Plus className="size-3.25" />
-                  </TerminalActionButton>
+                  </NewTerminalActionControl>
                   <TerminalActionButton
                     className="inline-flex h-full items-center border-l border-border/70 px-1 text-foreground/90 transition-colors hover:bg-accent/70"
                     onClick={() => confirmCloseTerminal(resolvedActiveTerminalId)}
@@ -1706,6 +1822,7 @@ export default function ThreadTerminalDrawer({
                         {terminalGroup.terminalIds.map((terminalId) => {
                           const isActive = terminalId === resolvedActiveTerminalId;
                           const terminalLabel = terminalLabelById.get(terminalId) ?? "Terminal";
+                          const hostLabel = resolveTerminalSessionIds(terminalId).hostLabel;
                           const closeTerminalLabel = `Close ${terminalLabel}${
                             isActive && closeShortcutLabel ? ` (${closeShortcutLabel})` : ""
                           }`;
@@ -1732,6 +1849,11 @@ export default function ThreadTerminalDrawer({
                                 onClick={() => onActiveTerminalChange(terminalId)}
                               >
                                 <span className="truncate">{terminalLabel}</span>
+                                {hostLabel ? (
+                                  <span className="shrink-0 truncate text-3xs text-muted-foreground">
+                                    {hostLabel}
+                                  </span>
+                                ) : null}
                               </button>
                             </div>
                           );

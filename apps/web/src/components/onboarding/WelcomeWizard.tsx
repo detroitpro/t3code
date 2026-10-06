@@ -1111,7 +1111,8 @@ function AgentInstallTerminal({
         {terminalReady ? (
           <TerminalViewport
             threadRef={threadRef}
-            threadId={AGENT_ONBOARDING_THREAD_ID}
+            sessionEnvironmentId={threadRef.environmentId}
+            sessionThreadId={AGENT_ONBOARDING_THREAD_ID}
             terminalId={terminalId}
             terminalLabel={`Install ${driver}`}
             cwd={cwd}

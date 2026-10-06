@@ -364,7 +364,9 @@ import { vcsEnvironment } from "../state/vcs";
 import { sourceControlEnvironment } from "../state/sourceControl";
 import { useProjectClone } from "../state/projectClones";
 import { projectCloneDisplayName, projectCloneProgressSummary } from "@t3tools/contracts";
+import { useBorrowedTerminalHost } from "../hooks/useBorrowedTerminalHost";
 import { useEnvironments, usePrimaryEnvironment } from "../state/environments";
+import type { TerminalHostBinding } from "../lib/terminalHostBinding";
 import {
   useProject,
   useProjects,
@@ -1095,60 +1097,89 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
     [storeSetTerminalHeight, threadRef],
   );
 
+  const borrowedHost = useBorrowedTerminalHost({
+    threadRef,
+    threadId,
+    sourceCanonicalKey: project?.repositoryIdentity?.canonicalKey,
+  });
+
+  const openTerminalSession = useCallback(
+    (terminalId: string, binding: TerminalHostBinding | null | undefined) => {
+      if (binding) {
+        void openTerminal({
+          environmentId: binding.executionEnvironmentId,
+          input: {
+            threadId: binding.hostThreadId,
+            terminalId,
+            cwd: binding.cwd,
+            ...(binding.worktreePath != null ? { worktreePath: binding.worktreePath } : {}),
+          },
+        });
+        return;
+      }
+      if (!cwd) {
+        return;
+      }
+      void openTerminal({
+        environmentId: threadRef.environmentId,
+        input: {
+          threadId,
+          terminalId,
+          cwd,
+          ...(effectiveWorktreePath != null ? { worktreePath: effectiveWorktreePath } : {}),
+          env: runtimeEnv,
+        },
+      });
+    },
+    [cwd, effectiveWorktreePath, openTerminal, runtimeEnv, threadId, threadRef.environmentId],
+  );
+
   const splitTerminal = useCallback(() => {
-    if (!cwd) {
+    const activeBinding =
+      terminalUiState.hostBindingsByTerminalId[terminalUiState.activeTerminalId] ?? null;
+    if (!activeBinding && !cwd) {
       return;
     }
     const terminalId = nextTerminalId(allocatableTerminalIds);
-    storeSplitTerminal(threadRef, terminalId);
+    storeSplitTerminal(
+      threadRef,
+      terminalId,
+      activeBinding ? { hostBinding: activeBinding } : undefined,
+    );
     bumpFocusRequestId();
-    void openTerminal({
-      environmentId: threadRef.environmentId,
-      input: {
-        threadId,
-        terminalId,
-        cwd,
-        ...(effectiveWorktreePath != null ? { worktreePath: effectiveWorktreePath } : {}),
-        env: runtimeEnv,
-      },
-    });
+    openTerminalSession(terminalId, activeBinding);
   }, [
     allocatableTerminalIds,
     bumpFocusRequestId,
     cwd,
-    effectiveWorktreePath,
-    runtimeEnv,
+    openTerminalSession,
     storeSplitTerminal,
-    threadId,
+    terminalUiState.activeTerminalId,
+    terminalUiState.hostBindingsByTerminalId,
     threadRef,
-    openTerminal,
   ]);
   const splitTerminalVertical = useCallback(() => {
-    if (!cwd) {
+    const activeBinding =
+      terminalUiState.hostBindingsByTerminalId[terminalUiState.activeTerminalId] ?? null;
+    if (!activeBinding && !cwd) {
       return;
     }
     const terminalId = nextTerminalId(allocatableTerminalIds);
-    storeSplitTerminalVertical(threadRef, terminalId);
+    storeSplitTerminalVertical(
+      threadRef,
+      terminalId,
+      activeBinding ? { hostBinding: activeBinding } : undefined,
+    );
     bumpFocusRequestId();
-    void openTerminal({
-      environmentId: threadRef.environmentId,
-      input: {
-        threadId,
-        terminalId,
-        cwd,
-        ...(effectiveWorktreePath != null ? { worktreePath: effectiveWorktreePath } : {}),
-        env: runtimeEnv,
-      },
-    });
+    openTerminalSession(terminalId, activeBinding);
   }, [
     allocatableTerminalIds,
     bumpFocusRequestId,
     cwd,
-    effectiveWorktreePath,
-    openTerminal,
-    runtimeEnv,
+    openTerminalSession,
     storeSplitTerminalVertical,
-    threadId,
+    terminalUiState.activeTerminalId,
+    terminalUiState.hostBindingsByTerminalId,
     threadRef,
   ]);
 
@@ -1159,26 +1190,40 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
     const terminalId = nextTerminalId(allocatableTerminalIds);
     storeNewTerminal(threadRef, terminalId);
     bumpFocusRequestId();
-    void openTerminal({
-      environmentId: threadRef.environmentId,
-      input: {
-        threadId,
-        terminalId,
-        cwd,
-        ...(effectiveWorktreePath != null ? { worktreePath: effectiveWorktreePath } : {}),
-        env: runtimeEnv,
-      },
-    });
+    openTerminalSession(terminalId, null);
   }, [
     bumpFocusRequestId,
     cwd,
-    effectiveWorktreePath,
     allocatableTerminalIds,
-    runtimeEnv,
+    openTerminalSession,
     storeNewTerminal,
-    threadId,
     threadRef,
-    openTerminal,
+  ]);
+
+  const createNewTerminalOnThisMachine = useCallback(() => {
+    const binding = borrowedHost.resolveThisMachineBinding();
+    if (!binding) {
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: "Could not open a terminal on this machine",
+          description:
+            "No local project path is available. Add the repo on this machine or reconnect the local environment.",
+        }),
+      );
+      return;
+    }
+    const terminalId = nextTerminalId(allocatableTerminalIds);
+    storeNewTerminal(threadRef, terminalId, { hostBinding: binding });
+    bumpFocusRequestId();
+    openTerminalSession(terminalId, binding);
+  }, [
+    allocatableTerminalIds,
+    borrowedHost.resolveThisMachineBinding,
+    bumpFocusRequestId,
+    openTerminalSession,
+    storeNewTerminal,
+    threadRef,
   ]);
 
   const activateTerminal = useCallback(
@@ -1191,17 +1236,20 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
 
   const closeTerminal = useCallback(
     (terminalId: string) => {
+      const binding = terminalUiState.hostBindingsByTerminalId[terminalId];
+      const sessionEnvironmentId = binding?.executionEnvironmentId ?? threadRef.environmentId;
+      const sessionThreadId = binding?.hostThreadId ?? threadId;
       const fallbackExitWrite = () =>
         writeTerminal({
-          environmentId: threadRef.environmentId,
-          input: { threadId, terminalId, data: "exit\n" },
+          environmentId: sessionEnvironmentId,
+          input: { threadId: sessionThreadId, terminalId, data: "exit\n" },
         });
 
       void (async () => {
         const closeResult = await closeTerminalMutation({
-          environmentId: threadRef.environmentId,
+          environmentId: sessionEnvironmentId,
           input: {
-            threadId,
+            threadId: sessionThreadId,
             terminalId,
             deleteHistory: true,
           },
@@ -1217,6 +1265,7 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
     [
       bumpFocusRequestId,
       storeCloseTerminal,
+      terminalUiState.hostBindingsByTerminalId,
       threadId,
       threadRef,
       closeTerminalMutation,
@@ -1269,6 +1318,12 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
           onSplitTerminal={splitTerminal}
           onSplitTerminalVertical={splitTerminalVertical}
           onNewTerminal={createNewTerminal}
+          {...(borrowedHost.canOpenOnThisMachine
+            ? {
+                onNewTerminalOnThisMachine: createNewTerminalOnThisMachine,
+                thisMachineLabel: borrowedHost.thisMachineLabel,
+              }
+            : {})}
           splitShortcutLabel={visible ? splitShortcutLabel : undefined}
           splitVerticalShortcutLabel={visible ? splitVerticalShortcutLabel : undefined}
           newShortcutLabel={visible ? newShortcutLabel : undefined}
@@ -1280,6 +1335,8 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
           onAddTerminalContext={handleAddTerminalContext}
           terminalLabelsById={terminalLabelsById}
           terminalLaunchLocationsById={terminalLaunchLocationsById}
+          hostBindingsByTerminalId={terminalUiState.hostBindingsByTerminalId}
+          hostLabelsByEnvironmentId={borrowedHost.hostLabelsByEnvironmentId}
         />
       </div>
     </div>
@@ -4142,17 +4199,41 @@ export default function ChatView(props: ChatViewProps) {
       if (!activeThreadRef || hasReachedSplitLimit || !activeThreadId || !activeProject) {
         return;
       }
-      const cwdForOpen = gitCwd ?? activeProject.workspaceRoot;
+      const activeBinding =
+        terminalUiState.hostBindingsByTerminalId[terminalUiState.activeTerminalId] ?? null;
+      const cwdForOpen = activeBinding?.cwd ?? gitCwd ?? activeProject.workspaceRoot;
       if (!cwdForOpen) {
         return;
       }
       const terminalId = nextTerminalId(allocatableActiveTerminalIds);
       if (direction === "vertical") {
-        storeSplitTerminalVertical(activeThreadRef, terminalId);
+        storeSplitTerminalVertical(
+          activeThreadRef,
+          terminalId,
+          activeBinding ? { hostBinding: activeBinding } : undefined,
+        );
       } else {
-        storeSplitTerminal(activeThreadRef, terminalId);
+        storeSplitTerminal(
+          activeThreadRef,
+          terminalId,
+          activeBinding ? { hostBinding: activeBinding } : undefined,
+        );
       }
       setTerminalFocusRequestId((value) => value + 1);
+      if (activeBinding) {
+        void openTerminal({
+          environmentId: activeBinding.executionEnvironmentId,
+          input: {
+            threadId: activeBinding.hostThreadId,
+            terminalId,
+            cwd: activeBinding.cwd,
+            ...(activeBinding.worktreePath != null
+              ? { worktreePath: activeBinding.worktreePath }
+              : {}),
+          },
+        });
+        return;
+      }
       void openTerminal({
         environmentId,
         input: {
@@ -4179,6 +4260,8 @@ export default function ChatView(props: ChatViewProps) {
       hasReachedSplitLimit,
       storeSplitTerminal,
       storeSplitTerminalVertical,
+      terminalUiState.activeTerminalId,
+      terminalUiState.hostBindingsByTerminalId,
     ],
   );
   const createNewTerminal = useCallback(() => {
@@ -4219,16 +4302,19 @@ export default function ChatView(props: ChatViewProps) {
   const closeTerminal = useCallback(
     (terminalId: string) => {
       if (!activeThreadId || !activeThreadRef) return;
+      const binding = terminalUiState.hostBindingsByTerminalId[terminalId];
+      const sessionEnvironmentId = binding?.executionEnvironmentId ?? environmentId;
+      const sessionThreadId = binding?.hostThreadId ?? activeThreadId;
       const fallbackExitWrite = () =>
         writeTerminal({
-          environmentId,
-          input: { threadId: activeThreadId, terminalId, data: "exit\n" },
+          environmentId: sessionEnvironmentId,
+          input: { threadId: sessionThreadId, terminalId, data: "exit\n" },
         });
       void (async () => {
         const closeResult = await closeTerminalMutation({
-          environmentId,
+          environmentId: sessionEnvironmentId,
           input: {
-            threadId: activeThreadId,
+            threadId: sessionThreadId,
             terminalId,
             deleteHistory: true,
           },
@@ -4246,6 +4332,7 @@ export default function ChatView(props: ChatViewProps) {
       closeTerminalMutation,
       environmentId,
       storeCloseTerminal,
+      terminalUiState.hostBindingsByTerminalId,
       writeTerminal,
     ],
   );

@@ -5,6 +5,8 @@ import {
   foldSubagentActivities,
   formatSubagentModelLabel,
   formatSubagentTokenCount,
+  partitionAgentsForPanel,
+  partitionWorkflowsForPanel,
 } from "./subagentRuntime.ts";
 
 let sequence = 0;
@@ -550,6 +552,82 @@ describe("deriveAgentPanelModel", () => {
     const model = deriveAgentPanelModel({ agents: orphans });
     expect(model.workflows).toHaveLength(0);
     expect(model.directAgents.map((agent) => agent.id)).toEqual(["gone:wf:0"]);
+  });
+});
+
+describe("partitionAgentsForPanel", () => {
+  it("bands working/idle/completed and sorts completed newest first", () => {
+    const agents = fold([
+      activity("task.started", { taskId: "older", title: "Older" }, "2026-08-01T10:00:00.000Z"),
+      activity("task.started", { taskId: "idle-1", title: "Idle" }, "2026-08-01T10:00:01.000Z"),
+      activity("task.started", { taskId: "live", title: "Live" }, "2026-08-01T10:00:02.000Z"),
+      activity("task.started", { taskId: "newer", title: "Newer" }, "2026-08-01T10:00:03.000Z"),
+      activity(
+        "task.completed",
+        { taskId: "older", status: "completed" },
+        "2026-08-01T10:01:00.000Z",
+      ),
+      activity("task.updated", { taskId: "idle-1", status: "idle" }, "2026-08-01T10:01:30.000Z"),
+      activity("task.completed", { taskId: "newer", status: "failed" }, "2026-08-01T10:02:00.000Z"),
+    ]);
+    const bands = partitionAgentsForPanel(agents);
+    expect(bands.working.map((agent) => agent.id)).toEqual(["live"]);
+    expect(bands.idle.map((agent) => agent.id)).toEqual(["idle-1"]);
+    // Newest completion first; failures share the completed band.
+    expect(bands.completed.map((agent) => agent.id)).toEqual(["newer", "older"]);
+  });
+
+  it("keeps working agents in first-seen order", () => {
+    const agents = fold([
+      activity("task.started", { taskId: "first", title: "First" }, "2026-08-01T10:00:00.000Z"),
+      activity("task.started", { taskId: "second", title: "Second" }, "2026-08-01T10:00:01.000Z"),
+      activity(
+        "task.progress",
+        { taskId: "second", status: "running", summary: "hot" },
+        "2026-08-01T10:00:05.000Z",
+      ),
+    ]);
+    expect(partitionAgentsForPanel(agents).working.map((agent) => agent.id)).toEqual([
+      "first",
+      "second",
+    ]);
+  });
+});
+
+describe("partitionWorkflowsForPanel", () => {
+  it("keeps live workflows and shelves terminal runs newest first", () => {
+    const model = deriveAgentPanelModel({
+      agents: fold([
+        activity(
+          "task.started",
+          { taskId: "wf-old", taskType: "local_workflow", title: "old" },
+          "2026-08-01T10:00:00.000Z",
+        ),
+        activity(
+          "task.completed",
+          { taskId: "wf-old", status: "completed", taskType: "local_workflow" },
+          "2026-08-01T10:01:00.000Z",
+        ),
+        activity(
+          "task.started",
+          { taskId: "wf-live", taskType: "local_workflow", title: "live" },
+          "2026-08-01T10:00:02.000Z",
+        ),
+        activity(
+          "task.started",
+          { taskId: "wf-new", taskType: "local_workflow", title: "new" },
+          "2026-08-01T10:00:03.000Z",
+        ),
+        activity(
+          "task.completed",
+          { taskId: "wf-new", status: "failed", taskType: "local_workflow" },
+          "2026-08-01T10:02:00.000Z",
+        ),
+      ]),
+    });
+    const bands = partitionWorkflowsForPanel(model.workflows);
+    expect(bands.live.map((group) => group.workflow.id)).toEqual(["wf-live"]);
+    expect(bands.completed.map((group) => group.workflow.id)).toEqual(["wf-new", "wf-old"]);
   });
 });
 

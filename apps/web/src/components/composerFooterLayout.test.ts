@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { resolveContextStripLabelsCompact } from "./BranchToolbar.logic";
+import {
+  capReservedLabelWidth,
+  resolveContextStripCompactUpdate,
+  resolveContextStripLabelsCompact,
+  type ContextStripCompactLatch,
+} from "./BranchToolbar.logic";
 import {
   COMPOSER_FOOTER_COMPACT_BREAKPOINT_PX,
   COMPOSER_FOOTER_WIDE_ACTIONS_COMPACT_BREAKPOINT_PX,
@@ -300,6 +305,63 @@ describe("context strip labels and resting composer controls", () => {
     expect(
       resolveRestingComposerControlsLayout({ ...measurement, hostWidth: hostWidth(compact) }),
     ).toEqual(layout);
+  });
+
+  it("keeps a collapsed max-width from zeroing the reserved label", () => {
+    expect(capReservedLabelWidth(236.3, 0)).toBe(236.3);
+    expect(capReservedLabelWidth(400, 240)).toBe(240);
+    expect(capReservedLabelWidth(100, Number.NaN)).toBe(100);
+  });
+
+  it("does not expand again when the collapsed reading drops the labels", () => {
+    // The widths from the crash above. Reserving the labels stays compact.
+    // Measuring them as 0 once they collapse asks to expand, which mounts the
+    // labels, which asks to collapse, until React throws error 185.
+    const availableWidth = stripWidth;
+    const expandedNeeded = chromeWidth + labelWidth + naturalWidth;
+    const collapsedNeeded = chromeWidth + naturalWidth;
+    expect(
+      resolveContextStripLabelsCompact({
+        compact: false,
+        neededWidth: expandedNeeded,
+        availableWidth,
+      }),
+    ).toBe(true);
+    expect(
+      resolveContextStripLabelsCompact({
+        compact: true,
+        neededWidth: collapsedNeeded,
+        availableWidth,
+      }),
+    ).toBe(false);
+
+    let compact = false;
+    let latch: ContextStripCompactLatch | null = null;
+    const first = resolveContextStripCompactUpdate({
+      compact,
+      nextCompact: true,
+      availableWidth,
+      latch,
+    });
+    compact = first.compact;
+    latch = first.latch;
+    expect(compact).toBe(true);
+
+    const reversed = resolveContextStripCompactUpdate({
+      compact,
+      nextCompact: false,
+      availableWidth,
+      latch,
+    });
+    expect(reversed.compact).toBe(true);
+
+    const widened = resolveContextStripCompactUpdate({
+      compact: reversed.compact,
+      nextCompact: false,
+      availableWidth: availableWidth + 200,
+      latch: reversed.latch,
+    });
+    expect(widened.compact).toBe(false);
   });
 
   it("does not settle when the strip only reserves the visible controls", () => {

@@ -138,6 +138,62 @@ export function resolveContextStripLabelsCompact(input: {
     : input.neededWidth > input.availableWidth;
 }
 
+/**
+ * Cap a label's reserved width by its motion span's max-width.
+ *
+ * A max-width of 0 is the collapsed box, not the 240px the label may grow to.
+ * Capping with 0 drops the label out of the next measure, the strip expands,
+ * and the following measure collapses it again until React throws maximum
+ * update depth.
+ */
+export function capReservedLabelWidth(textWidth: number, maxWidth: number): number {
+  if (!(maxWidth > 0)) return textWidth;
+  return Math.min(textWidth, maxWidth);
+}
+
+export interface ContextStripCompactLatch {
+  availableWidth: number;
+  compact: boolean;
+}
+
+/**
+ * Apply a compact decision without letting the two readings of one strip
+ * width reverse each other.
+ *
+ * Collapsed and expanded passes can disagree by more than the hysteresis when
+ * a label's text measures as 0 only while it is hidden. The first pass
+ * compacts, the next expands, and the layout effect loops. Icons are the
+ * reading that fits, so a reversal at the same width stays compact until the
+ * strip actually resizes.
+ */
+export function resolveContextStripCompactUpdate(input: {
+  compact: boolean;
+  nextCompact: boolean;
+  availableWidth: number;
+  latch: ContextStripCompactLatch | null;
+}): { compact: boolean; latch: ContextStripCompactLatch | null } {
+  if (input.nextCompact === input.compact) {
+    return { compact: input.compact, latch: null };
+  }
+
+  const latch = input.latch;
+  const sameWidth =
+    latch !== null &&
+    Math.abs(input.availableWidth - latch.availableWidth) <=
+      CONTEXT_STRIP_COMPACT_EXPAND_HYSTERESIS_PX;
+  if (sameWidth && latch.compact !== input.nextCompact) {
+    return {
+      compact: true,
+      latch: { availableWidth: input.availableWidth, compact: true },
+    };
+  }
+
+  return {
+    compact: input.nextCompact,
+    latch: { availableWidth: input.availableWidth, compact: input.nextCompact },
+  };
+}
+
 export function resolveEnvModeLabel(mode: EnvMode): string {
   return mode === "worktree" ? "New worktree" : "Current checkout";
 }

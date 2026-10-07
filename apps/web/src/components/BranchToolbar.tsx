@@ -23,8 +23,11 @@ import { useComposerDraftStore, type DraftId } from "../composerDraftStore";
 import { EnvironmentMachineIcon } from "./EnvironmentMachineIcon";
 import { useProject, useThreadShell, useThreadShellsForProjectRefs } from "../state/entities";
 import {
+  type ContextStripCompactLatch,
   type EnvMode,
   type EnvironmentOption,
+  capReservedLabelWidth,
+  resolveContextStripCompactUpdate,
   resolveContextStripLabelsCompact,
   resolveCurrentWorkspaceLabel,
   resolveEnvModeLabel,
@@ -316,6 +319,31 @@ const COMPOSER_CONTEXT_MOTION_DURATION_MS = 180;
 const COMPOSER_CONTEXT_MOTION_EASING = "cubic-bezier(0.32, 0.72, 0, 1)";
 const COMPOSER_CONTEXT_LABEL_SELECTOR = "[data-composer-label]";
 
+let labelTextProbe: HTMLSpanElement | null = null;
+
+function probeLabelTextWidth(label: HTMLElement, text: string): number {
+  const body = label.ownerDocument.body;
+  if (!body) return 0;
+  const source = label.querySelector<HTMLElement>("[data-composer-label-motion]") ?? label;
+  const style = getComputedStyle(source);
+  const probe = labelTextProbe ?? label.ownerDocument.createElement("span");
+  if (labelTextProbe === null) {
+    probe.setAttribute("aria-hidden", "true");
+    probe.style.position = "absolute";
+    probe.style.left = "0";
+    probe.style.top = "0";
+    probe.style.visibility = "hidden";
+    probe.style.whiteSpace = "nowrap";
+    probe.style.pointerEvents = "none";
+    body.append(probe);
+    labelTextProbe = probe;
+  }
+  probe.style.font = style.font;
+  probe.style.letterSpacing = style.letterSpacing;
+  probe.textContent = text;
+  return probe.getBoundingClientRect().width;
+}
+
 /**
  * The width a label takes when shown, clipped parts included.
  *
@@ -326,18 +354,29 @@ const COMPOSER_CONTEXT_LABEL_SELECTOR = "[data-composer-label]";
  * strip then flips between labels and icons on every measure.
  *
  * A shown label never grows past its motion span's max width, so longer text
- * reserves only that much.
+ * reserves only that much. A collapsed max-width of 0 is not that cap: using
+ * it zeroes the reservation and the strip flips on the next pass.
  */
 function labelTextWidth(label: HTMLElement, range: Range): number {
+  // The phone and desktop copies of a control are both mounted. The hidden
+  // copy generates no box; measuring it would reserve its text twice.
+  if (label.offsetParent === null) return 0;
   const walker = document.createTreeWalker(label, NodeFilter.SHOW_TEXT);
   let width = 0;
+  let text = "";
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     range.selectNodeContents(node);
     width += range.getBoundingClientRect().width;
+    text += node.textContent ?? "";
+  }
+  // Some engines report a 0-wide text run once max-width: 0 collapses the
+  // label. The words are still in the tree, so measure those off the layout.
+  if (width <= 0 && text.trim().length > 0) {
+    width = probeLabelTextWidth(label, text);
   }
   const motion = label.querySelector<HTMLElement>("[data-composer-label-motion]");
   const maxWidth = motion ? Number.parseFloat(getComputedStyle(motion).maxWidth) : Number.NaN;
-  return Number.isFinite(maxWidth) ? Math.min(width, maxWidth) : width;
+  return capReservedLabelWidth(width, maxWidth);
 }
 
 /**
@@ -345,12 +384,14 @@ function labelTextWidth(label: HTMLElement, range: Range): number {
  *
  * Hidden labels stay measurable because their inner text keeps its natural
  * width while the outer layout box collapses. This lets every pass recompute
- * the expanded width without remembered values that could go stale or latch
- * the strip compact. A small hysteresis keeps the boundary from flapping.
+ * the expanded width. A small hysteresis keeps the boundary from flapping.
+ * If the collapsed and expanded readings still disagree, icons win until the
+ * strip width changes, instead of flipping until React gives up.
  */
 function useLabelsOverflow(element: HTMLDivElement | null): boolean {
   const [overflows, setOverflows] = useState(false);
   const pendingLabelRectsRef = useRef<Map<HTMLElement, DOMRect> | null>(null);
+  const compactLatchRef = useRef<ContextStripCompactLatch | null>(null);
   const labelAnimationsRef = useRef(new Map<HTMLElement, Animation>());
   // A render-synced mirror instead of useEffectEvent: the compiler memoizes
   // the event callback, which left observers reading the first render's null
@@ -419,14 +460,20 @@ function useLabelsOverflow(element: HTMLDivElement | null): boolean {
       neededWidth: needed,
       availableWidth: available,
     });
-    if (nextOverflows !== compact) {
-      pendingLabelRectsRef.current = new Map(
-        Array.from(current.querySelectorAll<HTMLElement>(COMPOSER_CONTEXT_LABEL_SELECTOR)).map(
-          (label) => [label, label.getBoundingClientRect()],
-        ),
-      );
-    }
-    setOverflows(nextOverflows);
+    const update = resolveContextStripCompactUpdate({
+      compact,
+      nextCompact: nextOverflows,
+      availableWidth: available,
+      latch: compactLatchRef.current,
+    });
+    compactLatchRef.current = update.latch;
+    if (update.compact === compact) return;
+    pendingLabelRectsRef.current = new Map(
+      Array.from(current.querySelectorAll<HTMLElement>(COMPOSER_CONTEXT_LABEL_SELECTOR)).map(
+        (label) => [label, label.getBoundingClientRect()],
+      ),
+    );
+    setOverflows(update.compact);
   }, []);
 
   useLayoutEffect(() => {

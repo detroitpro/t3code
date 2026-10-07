@@ -8,7 +8,6 @@ import {
   splitFilePathPosition,
   remapPathIntoWorkspaceRoot,
   workspaceRelativeFilePath,
-  workspaceRelativePathOrRoot,
 } from "./markdownLinks.ts";
 
 describe("inlineCodeFilePathCandidate", () => {
@@ -24,6 +23,15 @@ describe("inlineCodeFilePathCandidate", () => {
     ["127.0.0.1:3000", null],
     ["example.com/index.html", null],
     ["example.pl/index.html", null],
+    ["z-ai/glm-5.3", null],
+    ["z-ai/glm-5.3:12", null],
+    ["python/3.12", null],
+    ["Qwen/Qwen2.5-Coder", null],
+    ["meta-llama/Llama-3.1-8B", null],
+    ["share/man/ls.1", "share/man/ls.1"],
+    ["usr/lib/libfoo.so.1", "usr/lib/libfoo.so.1"],
+    ["vendor/jquery-3.6.0.min.js", "vendor/jquery-3.6.0.min.js"],
+    ["./models/glm-5.3", "./models/glm-5.3"],
   ])("distinguishes file paths from code and hostnames in %s", (source, candidate) => {
     expect(inlineCodeFilePathCandidate(source)).toBe(candidate);
   });
@@ -148,6 +156,11 @@ describe("fileBasename", () => {
 
 describe("workspaceRelativeFilePath", () => {
   it.each([
+    ["/repo/project", "/repo/project", "."],
+    ["/repo/project/", "/repo/project/", "."],
+    ["/", "/", "."],
+    ["C:/USERS/mike/project", "c:/users/MIKE/project", "."],
+    ["C:/", "c:/", "."],
     ["/repo/project/src/main.ts", "/repo/project", "src/main.ts"],
     ["/repo/project/src/main.ts", "/repo/project/", "src/main.ts"],
     ["C:\\Users\\mike\\t3code\\apps\\web\\a.ts", "C:/Users/mike/t3code", "apps/web/a.ts"],
@@ -168,17 +181,6 @@ describe("workspaceRelativeFilePath", () => {
     ["/repo/project/a.ts", undefined, null],
   ])("relates %s to %s", (path, workspaceRoot, relativePath) => {
     expect(workspaceRelativeFilePath(path, workspaceRoot)).toBe(relativePath);
-  });
-});
-
-describe("workspaceRelativePathOrRoot", () => {
-  it("returns an empty path for the workspace root itself", () => {
-    expect(workspaceRelativePathOrRoot("/repo/project", "/repo/project")).toBe("");
-    expect(workspaceRelativePathOrRoot("/repo/project/", "/repo/project")).toBe("");
-  });
-
-  it("still returns null outside the workspace", () => {
-    expect(workspaceRelativePathOrRoot("/tmp/report.ts", "/repo/project")).toBeNull();
   });
 });
 

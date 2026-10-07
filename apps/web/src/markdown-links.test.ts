@@ -329,15 +329,15 @@ describe("resolveMarkdownFileLinkTarget", () => {
       ),
     ).toMatchObject({
       filePath: worktreeRoot,
-      workspaceRelativePath: "",
+      workspaceRelativePath: ".",
     });
 
     expect(
       markdownFilePanelPath({
         filePath: worktreeRoot,
-        workspaceRelativePath: "",
+        workspaceRelativePath: ".",
       }),
-    ).toBe("");
+    ).toBe(".");
   });
 
   it("keeps an encoded final space in the absolute target", () => {
@@ -557,5 +557,13 @@ describe("directory paths with a trailing separator", () => {
   it("does not produce an empty label for the filesystem root", () => {
     const meta = resolveMarkdownFileLinkMeta("/tmp/", "/repo/project");
     expect(meta?.basename).not.toBe("");
+  });
+});
+
+it("routes the project-root code link to the workspace explorer", () => {
+  const cwd = "/Users/saphid/.t3/worktrees/ov2-standalone-20260918";
+  expect(resolveInlineCodeFileLinkMeta(cwd, cwd)).toMatchObject({
+    workspaceRelativePath: ".",
+    filePath: cwd,
   });
 });

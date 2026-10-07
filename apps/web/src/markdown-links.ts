@@ -9,7 +9,7 @@ import {
   remapPathIntoWorkspaceRoot,
   safeDecodeURIComponent,
   splitFilePathPosition,
-  workspaceRelativePathOrRoot,
+  workspaceRelativeFilePath,
 } from "@t3tools/client-runtime/markdown-links";
 
 import { formatWorkspaceRelativePath } from "./filePathDisplay";
@@ -110,7 +110,7 @@ export function resolveMarkdownFileLinkMeta(
 }
 
 /**
- * Files panel path for a resolved link: workspace-relative (including `""` for
+ * Files panel path for a resolved link: workspace-relative (including `"."` for
  * the root directory), an absolute host path outside the workspace, or null.
  */
 export function markdownFilePanelPath(
@@ -151,7 +151,7 @@ function buildFileLinkMetaFromTarget(
     filePath: remappedPath,
     targetPath: remappedTargetPath,
     displayPath: formatWorkspaceRelativePath(remappedTargetPath, cwd),
-    workspaceRelativePath: workspaceRelativePathOrRoot(remappedPath, cwd),
+    workspaceRelativePath: workspaceRelativeFilePath(remappedPath, cwd),
     basename: fileBasename(remappedPath),
     ...(line !== undefined ? { line } : {}),
     ...(column !== undefined ? { column } : {}),

@@ -315,6 +315,10 @@ const MobileRunContextSelector = memo(function MobileRunContextSelector({
 const COMPOSER_CONTEXT_MOTION_DURATION_MS = 180;
 const COMPOSER_CONTEXT_MOTION_EASING = "cubic-bezier(0.32, 0.72, 0, 1)";
 const COMPOSER_CONTEXT_LABEL_SELECTOR = "[data-composer-label]";
+// Re-measures may flip the labels this many times before a resize or font
+// load has to supply new information. Latching one step from ideal is
+// cosmetic; React's "Maximum update depth exceeded" takes down the chat view.
+const MAX_CONSECUTIVE_LABEL_FLIPS = 3;
 
 /**
  * The width a label takes when shown, clipped parts included.
@@ -350,6 +354,10 @@ function labelTextWidth(label: HTMLElement, range: Range): number {
  */
 function useLabelsOverflow(element: HTMLDivElement | null): boolean {
   const [overflows, setOverflows] = useState(false);
+  // Flips since the last resize or font load. The layout effect below
+  // re-measures after every render, so a measurement that disagrees with
+  // itself across a flip would otherwise loop until React aborts the render.
+  const consecutiveFlipsRef = useRef(0);
   const pendingLabelRectsRef = useRef<Map<HTMLElement, DOMRect> | null>(null);
   const labelAnimationsRef = useRef(new Map<HTMLElement, Animation>());
   // A render-synced mirror instead of useEffectEvent: the compiler memoizes
@@ -419,15 +427,23 @@ function useLabelsOverflow(element: HTMLDivElement | null): boolean {
       neededWidth: needed,
       availableWidth: available,
     });
-    if (nextOverflows !== compact) {
-      pendingLabelRectsRef.current = new Map(
-        Array.from(current.querySelectorAll<HTMLElement>(COMPOSER_CONTEXT_LABEL_SELECTOR)).map(
-          (label) => [label, label.getBoundingClientRect()],
-        ),
-      );
-    }
+    // Skip no-op updates: inside a commit chain the fiber still has pending
+    // lanes, so React cannot bail out eagerly and would render again.
+    if (nextOverflows === compact) return;
+    if (consecutiveFlipsRef.current >= MAX_CONSECUTIVE_LABEL_FLIPS) return;
+    consecutiveFlipsRef.current += 1;
+    pendingLabelRectsRef.current = new Map(
+      Array.from(current.querySelectorAll<HTMLElement>(COMPOSER_CONTEXT_LABEL_SELECTOR)).map(
+        (label) => [label, label.getBoundingClientRect()],
+      ),
+    );
     setOverflows(nextOverflows);
   }, []);
+
+  const remeasure = useCallback(() => {
+    consecutiveFlipsRef.current = 0;
+    measure();
+  }, [measure]);
 
   useLayoutEffect(() => {
     const previousRects = pendingLabelRectsRef.current;
@@ -491,14 +507,14 @@ function useLabelsOverflow(element: HTMLDivElement | null): boolean {
 
   useEffect(() => {
     if (!element) return;
-    const observer = new ResizeObserver(measure);
+    const observer = new ResizeObserver(remeasure);
     observer.observe(element);
-    document.fonts.addEventListener("loadingdone", measure);
+    document.fonts.addEventListener("loadingdone", remeasure);
     return () => {
       observer.disconnect();
-      document.fonts.removeEventListener("loadingdone", measure);
+      document.fonts.removeEventListener("loadingdone", remeasure);
     };
-  }, [element, measure]);
+  }, [element, remeasure]);
 
   return overflows;
 }

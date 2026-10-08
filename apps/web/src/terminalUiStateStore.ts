@@ -51,10 +51,18 @@ export function migratePersistedTerminalUiStateStoreState(
   const candidate = persistedState as PersistedTerminalUiStateStoreState;
   const persistedUiStateByThreadKey =
     candidate.terminalUiStateByThreadKey ?? candidate.terminalStateByThreadKey ?? {};
+  // Layouts persisted before host bindings omit the map. Fill it here, once:
+  // selectors must return the stored object, or useSyncExternalStore sees a
+  // new snapshot on every read and loops until React aborts the render.
   const terminalUiStateByThreadKey = Object.fromEntries(
-    Object.entries(persistedUiStateByThreadKey).filter(([threadKey]) =>
-      parseScopedThreadKey(threadKey),
-    ),
+    Object.entries(persistedUiStateByThreadKey)
+      .filter(([threadKey]) => parseScopedThreadKey(threadKey))
+      .map(([threadKey, state]) => [
+        threadKey,
+        state.hostBindingsByTerminalId === undefined
+          ? { ...state, hostBindingsByTerminalId: {} }
+          : state,
+      ]),
   );
 
   return { terminalUiStateByThreadKey };
@@ -570,18 +578,9 @@ export function selectThreadTerminalUiState(
   if (!threadRef || threadRef.threadId.length === 0) {
     return getDefaultThreadTerminalUiState();
   }
-  const stored = terminalUiStateByThreadKey[terminalThreadKey(threadRef)];
-  if (!stored) {
-    return getDefaultThreadTerminalUiState();
-  }
-  // Persisted pre-binding layouts omit the map; normalize fills it.
-  if (stored.hostBindingsByTerminalId !== undefined) {
-    return stored;
-  }
-  return normalizeThreadTerminalUiState({
-    ...stored,
-    hostBindingsByTerminalId: {},
-  });
+  return (
+    terminalUiStateByThreadKey[terminalThreadKey(threadRef)] ?? getDefaultThreadTerminalUiState()
+  );
 }
 
 function updateTerminalUiStateByThreadKey(
@@ -908,7 +907,7 @@ export const useTerminalUiStateStore = create<TerminalUiStateStoreState>()(
     },
     {
       name: TERMINAL_UI_STATE_STORAGE_KEY,
-      version: 4,
+      version: 5,
       storage: createJSONStorage(createTerminalUiStateStorage),
       migrate: migratePersistedTerminalUiStateStoreState,
       partialize: (state) => ({

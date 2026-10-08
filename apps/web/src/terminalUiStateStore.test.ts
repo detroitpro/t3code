@@ -258,9 +258,32 @@ describe("terminalUiStateStore actions", () => {
           activeTerminalId: "term-1",
           terminalGroups: [{ id: "group-term-1", terminalIds: ["term-1"] }],
           activeTerminalGroupId: "group-term-1",
+          hostBindingsByTerminalId: {},
         },
       },
     });
+  });
+
+  it("reads a migrated pre-binding layout as the same object on every select", () => {
+    const { terminalUiStateByThreadKey = {} } = migratePersistedTerminalUiStateStoreState(
+      {
+        terminalUiStateByThreadKey: {
+          [scopedThreadKey(THREAD_REF)]: {
+            terminalOpen: true,
+            terminalHeight: 320,
+            terminalIds: ["term-1"],
+            activeTerminalId: "term-1",
+            terminalGroups: [{ id: "group-term-1", terminalIds: ["term-1"] }],
+            activeTerminalGroupId: "group-term-1",
+          },
+        },
+      },
+      4,
+    );
+
+    const first = selectThreadTerminalUiState(terminalUiStateByThreadKey, THREAD_REF);
+    expect(first.hostBindingsByTerminalId).toEqual({});
+    expect(selectThreadTerminalUiState(terminalUiStateByThreadKey, THREAD_REF)).toBe(first);
   });
 
   it("resets to default and clears persisted entry when closing the last terminal", () => {
